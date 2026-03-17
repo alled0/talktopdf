@@ -14,7 +14,10 @@ export default function ChatArea({
   onSendMessage,
   apiKey,
   onApiKeyChange,
-  hasDocuments
+  hasDocuments,
+  usageLimitReached,
+  proxyUsage,
+  freeLimit
 }) {
   const [input, setInput] = useState('')
   const messagesEndRef = useRef(null)
@@ -31,7 +34,7 @@ export default function ChatArea({
     ta.style.height = Math.min(ta.scrollHeight, 160) + 'px'
   }, [input])
 
-  const canSend = apiKey && hasDocuments && !isThinking && input.trim()
+  const canSend = hasDocuments && !isThinking && input.trim() && !usageLimitReached
 
   const handleSend = useCallback(() => {
     if (!canSend) return
@@ -144,12 +147,16 @@ export default function ChatArea({
       </div>
 
       <div className="flex-shrink-0 px-4 pb-4 pt-2" style={{ borderTop: '1px solid #1e2028' }}>
-        {!apiKey && (
-          <p className="text-xs mb-2 text-center" style={{ color: '#6b7280' }}>
-            Enter your Groq API key above to start chatting
+        {usageLimitReached ? (
+          <p className="text-xs mb-2 text-center" style={{ color: '#fca5a5' }}>
+            You've used your {freeLimit} free questions for today. Add your Groq API key above for unlimited access.
           </p>
-        )}
-        {!hasDocuments && apiKey && (
+        ) : !apiKey ? (
+          <p className="text-xs mb-2 text-center" style={{ color: '#6b7280' }}>
+            {freeLimit - proxyUsage} free question{freeLimit - proxyUsage !== 1 ? 's' : ''} remaining today · Add API key for unlimited
+          </p>
+        ) : null}
+        {!hasDocuments && (
           <p className="text-xs mb-2 text-center" style={{ color: '#6b7280' }}>
             Upload a document first
           </p>

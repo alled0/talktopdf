@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import Sidebar from './Sidebar.jsx'
 import ChatArea from './ChatArea.jsx'
 import { extractFile } from '../lib/pdfParser.js'
@@ -15,6 +15,13 @@ export default function RAGApp() {
   const [isThinking, setIsThinking] = useState(false)
   const [apiKey, setApiKey] = useState('')
   const [error, setError] = useState(null)
+
+  const FREE_LIMIT = 10
+  const usageKey = useMemo(() => `talktopdf_usage_${new Date().toISOString().slice(0, 10)}`, [])
+  const [proxyUsage, setProxyUsage] = useState(() =>
+    parseInt(localStorage.getItem(`talktopdf_usage_${new Date().toISOString().slice(0, 10)}`) || '0', 10)
+  )
+  const usageLimitReached = !apiKey && proxyUsage >= FREE_LIMIT
 
   const rebuildIndex = useCallback((allChunks) => {
     if (allChunks.length === 0) {
@@ -83,7 +90,7 @@ export default function RAGApp() {
   }, [docs, rebuildIndex])
 
   const handleSendMessage = useCallback(async (userText) => {
-    if (!apiKey || !userText.trim() || isThinking) return
+    if (!userText.trim() || isThinking || usageLimitReached) return
 
     const userMsg = { role: 'user', content: userText }
     setMessages(prev => [...prev, userMsg])
@@ -109,6 +116,12 @@ export default function RAGApp() {
         responseText = "Please upload some documents first so I can answer questions based on their content."
       }
 
+      if (!apiKey) {
+        const next = proxyUsage + 1
+        localStorage.setItem(usageKey, String(next))
+        setProxyUsage(next)
+      }
+
       const assistantMsg = {
         role: 'assistant',
         content: responseText,
@@ -120,7 +133,7 @@ export default function RAGApp() {
     } finally {
       setIsThinking(false)
     }
-  }, [apiKey, chunks, vocab, idf, messages, isThinking])
+  }, [apiKey, chunks, vocab, idf, messages, isThinking, usageLimitReached, proxyUsage, usageKey])
 
   const totalWords = chunks.reduce((sum, c) => sum + c.text.split(/\s+/).length, 0)
   const estimatedTokens = Math.round(totalWords * 1.3)
@@ -151,6 +164,9 @@ export default function RAGApp() {
         apiKey={apiKey}
         onApiKeyChange={setApiKey}
         hasDocuments={docs.length > 0}
+        usageLimitReached={usageLimitReached}
+        proxyUsage={proxyUsage}
+        freeLimit={FREE_LIMIT}
       />
     </div>
   )
