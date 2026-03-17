@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useRef } from 'react'
 import Sidebar from './Sidebar.jsx'
 import ChatArea from './ChatArea.jsx'
 import { extractFile } from '../lib/pdfParser.js'
@@ -9,8 +9,8 @@ import { askLLM, buildSystemPrompt } from '../lib/llm.js'
 export default function RAGApp() {
   const [docs, setDocs] = useState([])
   const [chunks, setChunks] = useState([])
-  const [vocab, setVocab] = useState(new Map())
-  const [idf, setIdf] = useState(new Map())
+  const vocabRef = useRef(new Map())
+  const idfRef = useRef(new Map())
   const [messages, setMessages] = useState([])
   const [isThinking, setIsThinking] = useState(false)
   const [apiKey, setApiKey] = useState('')
@@ -25,8 +25,8 @@ export default function RAGApp() {
 
   const rebuildIndex = useCallback((allChunks) => {
     if (allChunks.length === 0) {
-      setVocab(new Map())
-      setIdf(new Map())
+      vocabRef.current = new Map()
+      idfRef.current = new Map()
       return []
     }
 
@@ -38,8 +38,8 @@ export default function RAGApp() {
       vec: tfidf(chunk.text, newVocab, newIdf)
     }))
 
-    setVocab(newVocab)
-    setIdf(newIdf)
+    vocabRef.current = newVocab
+    idfRef.current = newIdf
     return vectorizedChunks
   }, [])
 
@@ -102,7 +102,7 @@ export default function RAGApp() {
 
       if (chunks.length > 0) {
         console.log('all chunks:', chunks)
-        const queryVec = tfidf(userText, vocab, idf)
+        const queryVec = tfidf(userText, vocabRef.current, idfRef.current)
         console.log('query vec:', queryVec)
         const retrieved = retrieve(queryVec, chunks, 6, 0.01)
         console.log('retrieved:', retrieved)
@@ -137,7 +137,7 @@ export default function RAGApp() {
     } finally {
       setIsThinking(false)
     }
-  }, [apiKey, chunks, vocab, idf, messages, isThinking, usageLimitReached, proxyUsage, usageKey])
+  }, [apiKey, chunks, messages, isThinking, usageLimitReached, proxyUsage, usageKey])
 
   const totalWords = chunks.reduce((sum, c) => sum + c.text.split(/\s+/).length, 0)
   const estimatedTokens = Math.round(totalWords * 1.3)
