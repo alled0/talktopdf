@@ -9,8 +9,7 @@ import { askLLM, buildSystemPrompt } from '../lib/llm.js'
 export default function RAGApp() {
   const [docs, setDocs] = useState([])
   const [chunks, setChunks] = useState([])
-  const vocabRef = useRef(new Map())
-  const idfRef = useRef(new Map())
+  const indexRef = useRef({ vocab: new Map(), idf: new Map(), chunks: [] })
   const [messages, setMessages] = useState([])
   const [isThinking, setIsThinking] = useState(false)
   const [apiKey, setApiKey] = useState('')
@@ -25,22 +24,21 @@ export default function RAGApp() {
 
   const rebuildIndex = useCallback((allChunks) => {
     if (allChunks.length === 0) {
-      vocabRef.current = new Map()
-      idfRef.current = new Map()
-      return []
+      indexRef.current = { vocab: new Map(), idf: new Map(), chunks: [] }
+      setChunks([])
+      return
     }
 
     const newVocab = buildVocab(allChunks)
     const newIdf = buildIDF(allChunks, newVocab)
 
-    const vectorizedChunks = allChunks.map(chunk => ({
-      ...chunk,
-      vec: tfidf(chunk.text, newVocab, newIdf)
+    const vectorizedChunks = allChunks.map(c => ({
+      ...c,
+      vec: tfidf(c.text, newVocab, newIdf)
     }))
 
-    vocabRef.current = newVocab
-    idfRef.current = newIdf
-    return vectorizedChunks
+    indexRef.current = { vocab: newVocab, idf: newIdf, chunks: vectorizedChunks }
+    setChunks(vectorizedChunks)
   }, [])
 
   const handleFilesAdded = useCallback(async (files) => {
@@ -59,11 +57,7 @@ export default function RAGApp() {
         const text = await extractFile(file)
         const docChunks = chunkText(text, file.name)
 
-        setChunks(prev => {
-          const allChunks = [...prev, ...docChunks]
-          const vectorized = rebuildIndex(allChunks)
-          return vectorized
-        })
+        rebuildIndex([...indexRef.current.chunks, ...docChunks])
 
         setDocs(prev => prev.map(d =>
           d.id === docId
@@ -82,11 +76,7 @@ export default function RAGApp() {
     if (!docToRemove) return
 
     setDocs(prev => prev.filter(d => d.id !== docId))
-    setChunks(prev => {
-      const remaining = prev.filter(c => c.doc !== docToRemove.name)
-      const vectorized = rebuildIndex(remaining)
-      return vectorized
-    })
+    rebuildIndex(indexRef.current.chunks.filter(c => c.doc !== docToRemove.name))
   }, [docs, rebuildIndex])
 
   const handleSendMessage = useCallback(async (userText) => {
@@ -100,11 +90,12 @@ export default function RAGApp() {
       let responseText
       let citations = []
 
-      if (chunks.length > 0) {
-        console.log('all chunks:', chunks)
-        const queryVec = tfidf(userText, vocabRef.current, idfRef.current)
+      const { vocab, idf, chunks: indexedChunks } = indexRef.current
+      if (indexedChunks.length > 0) {
+        console.log('all chunks:', indexedChunks)
+        const queryVec = tfidf(userText, vocab, idf)
         console.log('query vec:', queryVec)
-        const retrieved = retrieve(queryVec, chunks, 6, 0.01)
+        const retrieved = retrieve(queryVec, indexedChunks, 6, 0.01)
         console.log('retrieved:', retrieved)
 
         citations = retrieved.map(chunk => ({
@@ -137,7 +128,7 @@ export default function RAGApp() {
     } finally {
       setIsThinking(false)
     }
-  }, [apiKey, chunks, messages, isThinking, usageLimitReached, proxyUsage, usageKey])
+  }, [apiKey, messages, isThinking, usageLimitReached, proxyUsage, usageKey])
 
   const totalWords = chunks.reduce((sum, c) => sum + c.text.split(/\s+/).length, 0)
   const estimatedTokens = Math.round(totalWords * 1.3)
