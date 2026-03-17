@@ -57,30 +57,6 @@ export default function ChatArea({
 
   return (
     <div className="flex flex-col flex-1 h-full overflow-hidden">
-      <div className="flex items-center gap-3 px-4 py-3 flex-shrink-0"
-        style={{ backgroundColor: '#16181c', borderBottom: '1px solid #1e2028' }}>
-        <div className="relative">
-          <input
-            type="password"
-            placeholder="gsk_... API key"
-            value={apiKey}
-            onChange={e => onApiKeyChange(e.target.value)}
-            className="text-xs px-3 py-1.5 rounded-md outline-none w-48 transition-colors"
-            style={{
-              backgroundColor: '#1e2028',
-              border: `1px solid ${apiKey ? '#c8a96e44' : '#2d3040'}`,
-              color: '#9ca3af',
-              fontFamily: 'DM Mono, monospace'
-            }}
-          />
-          {apiKey && (
-            <div className="absolute right-2 top-1/2 -translate-y-1/2">
-              <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: '#5dbaa0' }} />
-            </div>
-          )}
-        </div>
-      </div>
-
       <div className="flex-1 overflow-y-auto custom-scrollbar px-6 py-4 space-y-6">
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full gap-6">

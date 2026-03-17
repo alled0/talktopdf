@@ -101,8 +101,11 @@ export default function RAGApp() {
       let citations = []
 
       if (chunks.length > 0) {
+        console.log('all chunks:', chunks)
         const queryVec = tfidf(userText, vocab, idf)
+        console.log('query vec:', queryVec)
         const retrieved = retrieve(queryVec, chunks, 6, 0.01)
+        console.log('retrieved:', retrieved)
 
         citations = retrieved.map(chunk => ({
           doc: chunk.doc.replace(/\.[^.]+$/, ''),
@@ -110,6 +113,7 @@ export default function RAGApp() {
         }))
 
         const systemPrompt = buildSystemPrompt(retrieved)
+        console.log('systemPrompt:', systemPrompt)
         const history = [...messages, userMsg]
         responseText = await askLLM(apiKey, 'llama-3.3-70b-versatile', history, systemPrompt)
       } else {
