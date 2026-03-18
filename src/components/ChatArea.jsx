@@ -157,7 +157,7 @@ export default function ChatArea({
           </p>
         ) : !apiKey ? (
           <p className="text-xs mb-2 text-center" style={{ color: '#6b7280' }}>
-            {freeLimit - proxyUsage} free question{freeLimit - proxyUsage !== 1 ? 's' : ''} remaining today · Add API key for unlimited
+            {freeLimit - proxyUsage} free question{freeLimit - proxyUsage !== 1 ? 's' : ''} remaining today
           </p>
         ) : null}
         {!hasDocuments && (
