@@ -95,6 +95,18 @@ export default function ChatArea({
               <p className="text-sm" style={{ color: '#6b7280' }}>
                 Upload a PDF, TXT, or MD file and start asking questions
               </p>
+              {!hasDocuments && (
+                <button
+                  onClick={onToggleSidebar}
+                  className="md:hidden mt-4 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium transition-colors duration-150"
+                  style={{ backgroundColor: '#c8a96e', color: '#0e0f11', fontFamily: 'DM Mono, monospace' }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66L9.41 17.41a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+                  </svg>
+                  Upload a document
+                </button>
+              )}
             </div>
             <div className="flex flex-wrap gap-2 justify-center px-4 max-w-lg w-full">
               {suggestions.map(s => (
