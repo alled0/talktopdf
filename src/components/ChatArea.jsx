@@ -225,6 +225,30 @@ export default function ChatArea({
         <p className="hidden md:block text-xs mt-1.5 text-center" style={{ color: '#4b5563' }}>
           Enter to send · Shift+Enter for newline
         </p>
+        <p className="text-xs mt-2 text-center" style={{ color: '#374151' }}>
+          Built by{' '}
+          <a
+            href="https://github.com/alled0"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: '#4b5563' }}
+            onMouseEnter={e => e.currentTarget.style.color = '#c8a96e'}
+            onMouseLeave={e => e.currentTarget.style.color = '#4b5563'}
+          >
+            @alled0
+          </a>
+          {' · '}
+          <a
+            href="https://github.com/alled0/talktopdf"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: '#4b5563' }}
+            onMouseEnter={e => e.currentTarget.style.color = '#c8a96e'}
+            onMouseLeave={e => e.currentTarget.style.color = '#4b5563'}
+          >
+            GitHub
+          </a>
+        </p>
       </div>
     </div>
   )
