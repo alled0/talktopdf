@@ -97,7 +97,8 @@ export default function RAGApp() {
         console.log('all chunks:', indexedChunks)
         const queryVec = tfidf(userText, vocab, idf)
         console.log('query vec:', queryVec)
-        const retrieved = retrieve(queryVec, indexedChunks, 6, 0.01)
+        let retrieved = retrieve(queryVec, indexedChunks, 6, 0.01)
+        if (retrieved.length === 0) retrieved = indexedChunks.slice(0, 6)
         console.log('retrieved:', retrieved)
 
         citations = retrieved.map(chunk => ({
