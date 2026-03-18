@@ -14,6 +14,7 @@ export default function RAGApp() {
   const [isThinking, setIsThinking] = useState(false)
   const [apiKey, setApiKey] = useState('')
   const [error, setError] = useState(null)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   const FREE_LIMIT = 10
   const usageKey = useMemo(() => `talktopdf_usage_${new Date().toISOString().slice(0, 10)}`, [])
@@ -42,6 +43,7 @@ export default function RAGApp() {
   }, [])
 
   const handleFilesAdded = useCallback(async (files) => {
+    setSidebarOpen(false)
     for (const file of files) {
       const docId = `${file.name}-${Date.now()}`
 
@@ -143,6 +145,15 @@ export default function RAGApp() {
         </div>
       )}
 
+      {/* Mobile backdrop */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-30 md:hidden"
+          style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       <Sidebar
         docs={docs}
         onFilesAdded={handleFilesAdded}
@@ -150,6 +161,8 @@ export default function RAGApp() {
         totalDocs={docs.length}
         totalChunks={chunks.length}
         estimatedTokens={estimatedTokens}
+        sidebarOpen={sidebarOpen}
+        onCloseSidebar={() => setSidebarOpen(false)}
       />
 
       <ChatArea
@@ -162,6 +175,7 @@ export default function RAGApp() {
         usageLimitReached={usageLimitReached}
         proxyUsage={proxyUsage}
         freeLimit={FREE_LIMIT}
+        onToggleSidebar={() => setSidebarOpen(s => !s)}
       />
     </div>
   )

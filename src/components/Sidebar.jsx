@@ -1,7 +1,7 @@
 import { useCallback, useRef } from 'react'
 import DocItem from './DocItem.jsx'
 
-export default function Sidebar({ docs, onFilesAdded, onRemoveDoc, totalDocs, totalChunks, estimatedTokens }) {
+export default function Sidebar({ docs, onFilesAdded, onRemoveDoc, totalDocs, totalChunks, estimatedTokens, sidebarOpen, onCloseSidebar }) {
   const fileInputRef = useRef(null)
 
   const handleDrop = useCallback((e) => {
@@ -19,12 +19,31 @@ export default function Sidebar({ docs, onFilesAdded, onRemoveDoc, totalDocs, to
   }, [onFilesAdded])
 
   return (
-    <div className="flex flex-col h-full" style={{ width: '270px', minWidth: '270px', backgroundColor: '#16181c', borderRight: '1px solid #1e2028' }}>
-      <div className="p-4" style={{ borderBottom: '1px solid #1e2028' }}>
-        <h1 className="text-lg font-semibold" style={{ fontFamily: 'Lora, serif', color: '#c8a96e' }}>
-          TalkToPDF
-        </h1>
-        <p className="text-xs mt-1" style={{ color: '#6b7280' }}>Chat with your documents</p>
+    <div
+      className={`flex flex-col h-full fixed inset-y-0 left-0 z-40 md:relative md:z-auto transition-transform duration-300 ease-in-out ${
+        sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+      }`}
+      style={{ width: '270px', minWidth: '270px', backgroundColor: '#16181c', borderRight: '1px solid #1e2028' }}
+    >
+      <div className="flex items-start justify-between p-4" style={{ borderBottom: '1px solid #1e2028' }}>
+        <div>
+          <h1 className="text-lg font-semibold" style={{ fontFamily: 'Lora, serif', color: '#c8a96e' }}>
+            TalkToPDF
+          </h1>
+          <p className="text-xs mt-1" style={{ color: '#6b7280' }}>Chat with your documents</p>
+        </div>
+        <button
+          className="md:hidden flex items-center justify-center w-8 h-8 rounded-lg mt-0.5 transition-colors"
+          style={{ color: '#6b7280' }}
+          onClick={onCloseSidebar}
+          onMouseEnter={e => e.currentTarget.style.color = '#e2e8f0'}
+          onMouseLeave={e => e.currentTarget.style.color = '#6b7280'}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
       </div>
 
       <div
