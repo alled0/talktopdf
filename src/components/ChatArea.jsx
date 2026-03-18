@@ -239,6 +239,17 @@ export default function ChatArea({
           </a>
           {' · '}
           <a
+            href="https://www.linkedin.com/in/alwaleed-meshal-almutairi-8a48ab263/"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: '#4b5563' }}
+            onMouseEnter={e => e.currentTarget.style.color = '#c8a96e'}
+            onMouseLeave={e => e.currentTarget.style.color = '#4b5563'}
+          >
+            LinkedIn
+          </a>
+          {' · '}
+          <a
             href="https://github.com/alled0/talktopdf"
             target="_blank"
             rel="noopener noreferrer"
