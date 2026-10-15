@@ -1,13 +1,14 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import Sidebar from './Sidebar.jsx'
 import ChatArea from './ChatArea.jsx'
 import SettingsPanel from './SettingsPanel.jsx'
 import SemanticStatus from './SemanticStatus.jsx'
+import SourcePanel from './SourcePanel.jsx'
 import { useEmbedState, useLibrary } from '../hooks/useLibrary.js'
 import { embedQuery } from '../lib/embeddings.js'
-import { retrieve } from '../lib/retrieval.js'
+import { coverageSelect, retrieve } from '../lib/retrieval.js'
 import { isBroadQuestion } from '../lib/query.js'
-import { streamAnswer } from '../lib/llm.js'
+import { rewriteQuery, streamAnswer, suggestQuestions } from '../lib/llm.js'
 import { EMBED_MODEL_SIZE_MB, FREE_DAILY_ANSWERS } from '../lib/config.js'
 import { readStorage, writeStorage } from '../lib/storage.js'
 
@@ -18,6 +19,8 @@ const freeStorageKey = () => `talktopdf_free_remaining_${new Date().toISOString(
 // Semantic search downloads a model once; skip it by default on data-saver connections.
 const defaultSemantic = () => (navigator.connection?.saveData ? 'off' : 'on')
 
+const newId = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+
 export default function RAGApp() {
   const [error, setError] = useState(null)
   const [apiKey, setApiKey] = useState(() => readStorage(KEY_STORAGE, ''))
@@ -26,15 +29,24 @@ export default function RAGApp() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [messages, setMessages] = useState([])
   const [isThinking, setIsThinking] = useState(false)
+  const [activeSource, setActiveSource] = useState(null) // { messageId, n }
+  const [suggestions, setSuggestions] = useState({ key: '', questions: [] })
   const [freeRemaining, setFreeRemaining] = useState(() =>
     Number(readStorage(freeStorageKey(), FREE_DAILY_ANSWERS))
   )
+  const abortRef = useRef(null)
+  const apiKeyRef = useRef(apiKey)
 
   const embedState = useEmbedState()
   const { library, docs, stats, addFiles, removeDoc } = useLibrary({ semanticEnabled, onError: setError })
   const usageLimitReached = !apiKey && freeRemaining <= 0
+  const readyDocs = docs.filter(d => d.status === 'ready')
+  const libraryKey = readyDocs.map(d => d.id).join('|')
 
-  useEffect(() => { writeStorage(KEY_STORAGE, apiKey || null) }, [apiKey])
+  useEffect(() => {
+    apiKeyRef.current = apiKey
+    writeStorage(KEY_STORAGE, apiKey || null)
+  }, [apiKey])
   useEffect(() => { writeStorage(SEMANTIC_STORAGE, semanticEnabled ? 'on' : 'off') }, [semanticEnabled])
 
   const updateFreeRemaining = useCallback((remaining) => {
@@ -43,47 +55,113 @@ export default function RAGApp() {
     writeStorage(freeStorageKey(), String(remaining))
   }, [])
 
+  // Starter questions written from a sample of the documents, refreshed when the library changes.
+  const conversationStarted = messages.length > 0
+  const processing = docs.some(d => d.status === 'reading')
+  useEffect(() => {
+    if (!libraryKey || conversationStarted || processing) return
+    let cancelled = false
+    const timer = setTimeout(async () => {
+      const ids = coverageSelect(library, { budget: 4500 })
+      const excerpts = ids.map(id => library.get(id).text).join('\n\n').slice(0, 5500)
+      const questions = await suggestQuestions({ apiKey: apiKeyRef.current, excerpts })
+      if (!cancelled && questions.length) setSuggestions({ key: libraryKey, questions })
+    }, 400)
+    return () => { cancelled = true; clearTimeout(timer) }
+  }, [libraryKey, conversationStarted, processing, library])
+
   const handleFilesAdded = useCallback((files) => {
     setSidebarOpen(false)
     addFiles(files)
   }, [addFiles])
 
-  const handleSendMessage = useCallback(async (question) => {
-    if (!question.trim() || isThinking || usageLimitReached || library.size === 0) return
-
-    const history = messages.filter(m => m.content)
-    setMessages(prev => [...prev, { role: 'user', content: question }, { role: 'assistant', content: '', sources: [] }])
+  const ask = useCallback(async (question, history) => {
+    const answerId = newId()
+    setMessages(prev => [
+      ...prev,
+      { id: newId(), role: 'user', content: question },
+      { id: answerId, role: 'assistant', content: '', status: 'searching', sources: [] }
+    ])
+    const patch = fields => setMessages(prev => prev.map(m => (m.id === answerId ? { ...m, ...fields } : m)))
+    const controller = new AbortController()
+    abortRef.current = controller
     setIsThinking(true)
 
-    const setAnswer = (patch) => setMessages(prev => {
-      const next = [...prev]
-      next[next.length - 1] = { ...next[next.length - 1], ...patch }
-      return next
-    })
-
     try {
-      const scope = isBroadQuestion(question) ? 'broad' : 'specific'
-      const queryVec = semanticEnabled ? await embedQuery(question) : null
-      const { sources, lowConfidence } = retrieve(library, { query: question, queryVec, scope })
+      // Follow-ups ("what about the second one?") are rewritten into standalone search queries.
+      let query = question
+      let scope = isBroadQuestion(question) ? 'broad' : 'specific'
+      if (history.length) {
+        const rewritten = await rewriteQuery({ apiKey, question, history, signal: controller.signal })
+        if (rewritten) {
+          query = rewritten.query
+          if (rewritten.scope === 'broad') scope = 'broad'
+        } else {
+          const previous = history.filter(m => m.role === 'user').at(-1)
+          if (previous) query = `${previous.content} ${question}`
+        }
+      }
+
+      const queryVec = semanticEnabled ? await embedQuery(query) : null
+      const result = retrieve(library, { query, queryVec, scope })
+      patch({ status: 'streaming', query, sources: result.sources, mode: result.mode, lowConfidence: result.lowConfidence })
 
       const { remaining } = await streamAnswer({
         apiKey,
         question,
         history,
-        sources,
+        sources: result.sources,
         scope,
-        onText: text => setAnswer({ content: text })
+        signal: controller.signal,
+        onText: content => patch({ content })
       })
-      setAnswer({ sources, lowConfidence })
+      patch({ status: 'done' })
       updateFreeRemaining(remaining)
     } catch (err) {
-      if (err.limitReached) updateFreeRemaining(0)
-      setMessages(prev => prev.slice(0, -1))
-      setError(err.message)
+      if (err.name === 'AbortError') {
+        patch({ status: 'stopped' })
+      } else {
+        if (err.limitReached) updateFreeRemaining(0)
+        patch({ status: 'error', error: err.message })
+      }
     } finally {
+      abortRef.current = null
       setIsThinking(false)
     }
-  }, [apiKey, messages, isThinking, usageLimitReached, library, semanticEnabled, updateFreeRemaining])
+  }, [apiKey, library, semanticEnabled, updateFreeRemaining])
+
+  // Earlier turns sent as conversation context (failed answers are left out).
+  const historyOf = msgs => msgs
+    .filter(m => m.content && m.status !== 'error')
+    .map(m => ({ role: m.role, content: m.content }))
+
+  const handleSendMessage = useCallback((question) => {
+    if (!question.trim() || isThinking || usageLimitReached || library.size === 0) return
+    ask(question, historyOf(messages))
+  }, [ask, isThinking, usageLimitReached, library, messages])
+
+  const handleRetry = useCallback((answerId) => {
+    if (isThinking) return
+    const index = messages.findIndex(m => m.id === answerId)
+    const question = messages[index - 1]
+    if (index < 1 || question?.role !== 'user') return
+    const earlier = messages.slice(0, index - 1)
+    setMessages(earlier)
+    ask(question.content, historyOf(earlier))
+  }, [ask, isThinking, messages])
+
+  const handleStop = useCallback(() => abortRef.current?.abort(), [])
+
+  const handleNewChat = useCallback(() => {
+    abortRef.current?.abort()
+    setMessages([])
+    setActiveSource(null)
+  }, [])
+
+  const openSource = useCallback((messageId, n) => setActiveSource({ messageId, n }), [])
+  const closeSource = useCallback(() => setActiveSource(null), [])
+  const selectSource = useCallback(n => setActiveSource(s => (s ? { ...s, n } : s)), [])
+  const sourceMessage = activeSource && messages.find(m => m.id === activeSource.messageId)
 
   const closeSettings = useCallback(() => setSettingsOpen(false), [])
 
@@ -117,14 +195,24 @@ export default function RAGApp() {
         messages={messages}
         isThinking={isThinking}
         onSendMessage={handleSendMessage}
+        onStop={handleStop}
+        onRetry={handleRetry}
+        onOpenSource={openSource}
+        onNewChat={handleNewChat}
         apiKey={apiKey}
         hasDocuments={stats.chunks > 0}
+        docCount={readyDocs.length}
         usageLimitReached={usageLimitReached}
         freeRemaining={freeRemaining}
         freeLimit={FREE_DAILY_ANSWERS}
+        suggestions={suggestions.key === libraryKey ? suggestions.questions : null}
         onToggleSidebar={() => setSidebarOpen(s => !s)}
         onOpenSettings={() => setSettingsOpen(true)}
       />
+
+      {sourceMessage && (
+        <SourcePanel message={sourceMessage} activeN={activeSource.n} onSelect={selectSource} onClose={closeSource} />
+      )}
 
       {settingsOpen && (
         <SettingsPanel

@@ -14,3 +14,7 @@ export function formatBytes(bytes) {
 export function formatCount(n) {
   return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n)
 }
+
+/** "report · p. 4" for a retrieved source. */
+export const sourceShortLabel = source =>
+  `${stripExtension(source.docName)} · ${formatPages(source.pageStart, source.pageEnd) || `part ${source.part}`}`

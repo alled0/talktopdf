@@ -1,33 +1,53 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, useLayoutEffect } from 'react'
 import Message from './Message.jsx'
-import { SettingsIcon } from './Icons.jsx'
+import { ArrowUpIcon, MenuIcon, PaperclipIcon, PlusIcon, SettingsIcon, StopIcon } from './Icons.jsx'
 
-const suggestions = [
+const DEFAULT_SUGGESTIONS = [
   'Give me a summary',
   "What's the main argument?",
   'Pull out any key dates or names',
   'What does it conclude?'
 ]
 
+const LINKS = [
+  ['@alled0', 'https://github.com/alled0'],
+  ['LinkedIn', 'https://www.linkedin.com/in/alwaleed-meshal-almutairi-8a48ab263/'],
+  ['GitHub', 'https://github.com/alled0/talktopdf']
+]
+
 export default function ChatArea({
   messages,
   isThinking,
   onSendMessage,
+  onStop,
+  onRetry,
+  onOpenSource,
+  onNewChat,
   apiKey,
   hasDocuments,
+  docCount,
   usageLimitReached,
   freeRemaining,
   freeLimit,
+  suggestions,
   onToggleSidebar,
   onOpenSettings
 }) {
   const [input, setInput] = useState('')
-  const messagesEndRef = useRef(null)
+  const scrollRef = useRef(null)
   const textareaRef = useRef(null)
+  const stickToBottom = useRef(true)
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, isThinking])
+  // Follow new content only while the reader is already at the bottom.
+  const handleScroll = useCallback(() => {
+    const el = scrollRef.current
+    stickToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120
+  }, [])
+
+  useLayoutEffect(() => {
+    const el = scrollRef.current
+    if (el && stickToBottom.current) el.scrollTop = el.scrollHeight
+  }, [messages])
 
   useEffect(() => {
     const ta = textareaRef.current
@@ -38,248 +58,166 @@ export default function ChatArea({
 
   const canSend = hasDocuments && !isThinking && input.trim() && !usageLimitReached
 
+  const send = useCallback((text) => {
+    stickToBottom.current = true
+    onSendMessage(text)
+  }, [onSendMessage])
+
   const handleSend = useCallback(() => {
     if (!canSend) return
-    onSendMessage(input.trim())
+    send(input.trim())
     setInput('')
-    if (textareaRef.current) textareaRef.current.style.height = 'auto'
-  }, [canSend, input, onSendMessage])
+  }, [canSend, input, send])
 
   const handleKeyDown = useCallback((e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault()
       handleSend()
     }
   }, [handleSend])
 
   const handleChip = useCallback((chip) => {
-    setInput(chip)
-    textareaRef.current?.focus()
-  }, [])
+    if (hasDocuments && !isThinking && !usageLimitReached) {
+      send(chip)
+    } else {
+      setInput(chip)
+      textareaRef.current?.focus()
+    }
+  }, [hasDocuments, isThinking, usageLimitReached, send])
+
+  const chips = suggestions?.length ? suggestions : DEFAULT_SUGGESTIONS
 
   return (
-    <div className="flex flex-col flex-1 h-full overflow-hidden min-w-0">
-
-      {/* Mobile-only top bar */}
-      <div className="flex md:hidden items-center gap-3 px-4 py-3 flex-shrink-0"
-        style={{ backgroundColor: '#16181c', borderBottom: '1px solid #1e2028' }}>
-        <button
-          onClick={onToggleSidebar}
-          aria-label="Open documents"
-          className="flex items-center justify-center w-8 h-8 rounded-lg transition-colors flex-shrink-0"
-          style={{ color: '#9ca3af' }}
-          onMouseEnter={e => e.currentTarget.style.color = '#e2e8f0'}
-          onMouseLeave={e => e.currentTarget.style.color = '#9ca3af'}
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <line x1="3" y1="6" x2="21" y2="6" />
-            <line x1="3" y1="12" x2="21" y2="12" />
-            <line x1="3" y1="18" x2="21" y2="18" />
-          </svg>
+    <main className="flex flex-col flex-1 h-full overflow-hidden min-w-0">
+      <header className="flex items-center gap-2 px-3 md:px-5 py-2.5 flex-shrink-0 bg-surface md:bg-transparent border-b border-line">
+        <button onClick={onToggleSidebar} aria-label="Open documents"
+          className="md:hidden flex items-center justify-center w-8 h-8 rounded-lg text-muted hover:text-ink transition-colors">
+          <MenuIcon size={20} />
         </button>
-        <h1 className="text-base font-semibold" style={{ fontFamily: 'Lora, serif', color: '#c8a96e' }}>
-          TalkToPDF
-        </h1>
-        {hasDocuments && (
-          <span className="ml-auto text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: '#c8a96e22', color: '#c8a96e' }}>
-            docs ready
-          </span>
-        )}
-        <button onClick={onOpenSettings} aria-label="Settings"
-          className={`${hasDocuments ? '' : 'ml-auto '}w-8 h-8 rounded-lg flex items-center justify-center text-muted hover:text-ink transition-colors`}>
-          <SettingsIcon />
-        </button>
-      </div>
+        <h1 className="md:hidden font-serif text-base font-semibold text-accent">TalkToPDF</h1>
+        <span className="hidden md:inline text-xs text-subtle">
+          {hasDocuments ? `${docCount} document${docCount === 1 ? '' : 's'} ready` : 'No documents yet'}
+        </span>
+        <div className="ml-auto flex items-center gap-1">
+          {messages.length > 0 && (
+            <button onClick={onNewChat} disabled={isThinking}
+              className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-xs text-muted hover:text-ink hover:bg-elevated disabled:opacity-40 transition-colors">
+              <PlusIcon size={14} /> <span>New chat</span>
+            </button>
+          )}
+          <button onClick={onOpenSettings} aria-label="Settings"
+            className="md:hidden w-8 h-8 rounded-lg flex items-center justify-center text-muted hover:text-ink transition-colors">
+            <SettingsIcon />
+          </button>
+        </div>
+      </header>
 
-
-      <div className="flex-1 overflow-y-auto custom-scrollbar px-3 md:px-6 py-4 space-y-6">
+      <div ref={scrollRef} onScroll={handleScroll}
+        className="flex-1 overflow-y-auto custom-scrollbar px-3 md:px-6 py-5"
+        aria-live="polite">
         {messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full gap-6">
-            <div className="text-center px-4">
-              <h2 className="text-xl md:text-2xl font-semibold mb-2" style={{ fontFamily: 'Lora, serif', color: '#c8a96e' }}>
+          <div className="flex flex-col items-center justify-center min-h-full gap-6 py-6">
+            <div className="text-center px-4 max-w-md">
+              <h2 className="font-serif text-xl md:text-2xl font-semibold mb-2 text-accent">
                 Ask your documents anything
               </h2>
-              <p className="text-sm" style={{ color: '#6b7280' }}>
-                Upload a PDF, TXT, or MD file and start asking questions
+              <p className="text-sm text-subtle leading-relaxed">
+                {hasDocuments
+                  ? 'Answers cite the exact pages they come from. Click a citation to read the passage.'
+                  : 'Add a PDF, TXT or Markdown file. It is read and indexed privately in your browser.'}
               </p>
               {!hasDocuments && (
-                <button
-                  onClick={onToggleSidebar}
-                  className="md:hidden mt-4 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium transition-colors duration-150"
-                  style={{ backgroundColor: '#c8a96e', color: '#0e0f11', fontFamily: 'DM Mono, monospace' }}
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                    <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66L9.41 17.41a2 2 0 0 1-2.83-2.83l8.49-8.48" />
-                  </svg>
+                <button onClick={onToggleSidebar}
+                  className="md:hidden mt-4 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium bg-accent text-bg">
+                  <PaperclipIcon size={16} strokeWidth={2.5} />
                   Upload a document
                 </button>
               )}
             </div>
-            <div className="flex flex-wrap gap-2 justify-center px-4 max-w-lg w-full">
-              {suggestions.map(s => (
-                <button
-                  key={s}
-                  onClick={() => handleChip(s)}
-                  className="px-3 md:px-4 py-2 rounded-full text-xs md:text-sm transition-colors duration-150"
-                  style={{
-                    backgroundColor: '#1e2028',
-                    border: '1px solid #2d3040',
-                    color: '#9ca3af',
-                    fontFamily: 'DM Mono, monospace'
-                  }}
-                  onMouseEnter={e => {
-                    e.currentTarget.style.borderColor = '#c8a96e44'
-                    e.currentTarget.style.color = '#c8a96e'
-                  }}
-                  onMouseLeave={e => {
-                    e.currentTarget.style.borderColor = '#2d3040'
-                    e.currentTarget.style.color = '#9ca3af'
-                  }}
-                >
-                  {s}
-                </button>
-              ))}
+            <div className="flex flex-col items-center gap-2 px-4 max-w-xl w-full">
+              {suggestions?.length > 0 && (
+                <p className="text-[11px] uppercase tracking-wider text-faint">Suggested from your documents</p>
+              )}
+              <div className="flex flex-wrap gap-2 justify-center">
+                {chips.map(s => (
+                  <button key={s} onClick={() => handleChip(s)} dir="auto"
+                    className="px-3 md:px-4 py-2 rounded-full text-xs md:text-sm bg-elevated border border-line-strong text-muted hover:border-accent/40 hover:text-accent transition-colors duration-150">
+                    {s}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         ) : (
-          <>
-            {messages.map((msg, i) => (
-              msg.content ? <Message key={i} message={msg} /> : null
+          <div className="space-y-6 max-w-3xl mx-auto">
+            {messages.map(msg => (
+              <Message key={msg.id} message={msg} onOpenSource={onOpenSource} onRetry={onRetry} />
             ))}
+          </div>
+        )}
+      </div>
 
-            {isThinking && !messages[messages.length - 1]?.content && (
-              <div className="flex gap-3 fade-in">
-                <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
-                  style={{ backgroundColor: '#5dbaa022', color: '#5dbaa0', border: '1px solid #5dbaa044' }}>
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z" />
-                  </svg>
-                </div>
-                <div className="px-4 py-3 rounded-xl" style={{ backgroundColor: '#16181c', border: '1px solid #1e2028' }}>
-                  <div className="flex gap-1.5 items-center h-5">
-                    <div className="w-2 h-2 rounded-full thinking-dot" style={{ backgroundColor: '#5dbaa0' }} />
-                    <div className="w-2 h-2 rounded-full thinking-dot" style={{ backgroundColor: '#5dbaa0' }} />
-                    <div className="w-2 h-2 rounded-full thinking-dot" style={{ backgroundColor: '#5dbaa0' }} />
-                  </div>
-                </div>
-              </div>
+      <div className="flex-shrink-0 px-3 md:px-4 pb-4 pt-2 border-t border-line">
+        <div className="max-w-3xl mx-auto">
+          <div className="flex items-center justify-center gap-2 mb-2 text-xs">
+            {usageLimitReached ? (
+              <p className="text-danger text-center">
+                You've used today's {freeLimit} free questions.{' '}
+                <button onClick={onOpenSettings} className="underline hover:text-ink">Add your free Groq key</button>
+                {' '}to keep going.
+              </p>
+            ) : apiKey ? (
+              <p className="text-subtle">Using your Groq key · unlimited</p>
+            ) : (
+              <p className="text-subtle">
+                {freeRemaining} free question{freeRemaining !== 1 ? 's' : ''} left today
+              </p>
             )}
-          </>
-        )}
-        <div ref={messagesEndRef} />
-      </div>
+          </div>
 
-      <div className="flex-shrink-0 px-3 md:px-4 pb-4 pt-2" style={{ borderTop: '1px solid #1e2028' }}>
-        <div className="flex items-center justify-center gap-2 mb-2 text-xs">
-          {usageLimitReached ? (
-            <p className="text-danger">
-              You've used today's {freeLimit} free questions.{' '}
-              <button onClick={onOpenSettings} className="underline hover:text-ink">Add your free Groq key</button>
-              {' '}to keep going.
-            </p>
-          ) : apiKey ? (
-            <p className="text-subtle">Using your Groq key · unlimited</p>
-          ) : (
-            <p className="text-subtle">
-              {freeRemaining} free question{freeRemaining !== 1 ? 's' : ''} left today
-            </p>
-          )}
-          <button onClick={onOpenSettings} aria-label="Settings"
-            className="hidden md:inline-flex items-center gap-1 text-faint hover:text-accent transition-colors">
-            · <SettingsIcon size={12} /> Settings
-          </button>
-        </div>
-        {!hasDocuments && (
-          <p className="text-xs mb-2 text-center" style={{ color: '#6b7280' }}>
-            Upload a document first
+          <div className="flex gap-2 items-end p-2 rounded-xl bg-surface border border-line-strong focus-within:border-accent/40 transition-colors">
+            <button onClick={onToggleSidebar} aria-label="Add documents"
+              className="md:hidden flex-shrink-0 w-9 h-9 rounded-lg flex items-center justify-center text-subtle hover:text-accent transition-colors">
+              <PaperclipIcon />
+            </button>
+            <textarea
+              ref={textareaRef}
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder={hasDocuments ? 'Ask something…' : 'Upload a document to begin…'}
+              aria-label="Your question"
+              dir="auto"
+              rows={1}
+              className="flex-1 resize-none bg-transparent outline-none text-sm leading-relaxed text-ink placeholder:text-faint caret-accent min-h-[24px] max-h-[160px] py-1.5"
+            />
+            {isThinking ? (
+              <button onClick={onStop} aria-label="Stop generating"
+                className="flex-shrink-0 w-9 h-9 rounded-lg flex items-center justify-center bg-elevated text-ink hover:bg-line-strong transition-colors">
+                <StopIcon size={14} />
+              </button>
+            ) : (
+              <button onClick={handleSend} disabled={!canSend} aria-label="Send"
+                className="flex-shrink-0 w-9 h-9 rounded-lg flex items-center justify-center transition-all duration-150 bg-accent text-bg disabled:bg-elevated disabled:text-subtle disabled:opacity-50 disabled:cursor-not-allowed">
+                <ArrowUpIcon size={16} strokeWidth={2.5} />
+              </button>
+            )}
+          </div>
+
+          <p className="hidden md:block text-xs mt-1.5 text-center text-faint">
+            Enter to send · Shift+Enter for a new line
           </p>
-        )}
-        <div className="flex gap-2 items-end p-2 rounded-xl" style={{ backgroundColor: '#16181c', border: '1px solid #2d3040' }}>
-          <button
-            onClick={onToggleSidebar}
-            aria-label="Add documents"
-            className="md:hidden flex-shrink-0 w-9 h-9 rounded-lg flex items-center justify-center transition-colors duration-150"
-            style={{ color: '#6b7280' }}
-            onMouseEnter={e => e.currentTarget.style.color = '#c8a96e'}
-            onMouseLeave={e => e.currentTarget.style.color = '#6b7280'}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66L9.41 17.41a2 2 0 0 1-2.83-2.83l8.49-8.48" />
-            </svg>
-          </button>
-          <textarea
-            ref={textareaRef}
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={hasDocuments ? 'Ask something...' : 'Upload a document to begin...'}
-            rows={1}
-            className="flex-1 resize-none bg-transparent outline-none text-sm leading-relaxed"
-            style={{
-              color: '#e2e8f0',
-              fontFamily: 'DM Mono, monospace',
-              minHeight: '24px',
-              maxHeight: '160px',
-              caretColor: '#c8a96e'
-            }}
-          />
-          <button
-            onClick={handleSend}
-            disabled={!canSend}
-            aria-label="Send"
-            className="flex-shrink-0 w-9 h-9 rounded-lg flex items-center justify-center transition-all duration-150"
-            style={{
-              backgroundColor: canSend ? '#c8a96e' : '#1e2028',
-              cursor: canSend ? 'pointer' : 'not-allowed',
-              opacity: canSend ? 1 : 0.5
-            }}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-              stroke={canSend ? '#0e0f11' : '#6b7280'} strokeWidth="2.5">
-              <line x1="12" y1="19" x2="12" y2="5" />
-              <polyline points="5 12 12 5 19 12" />
-            </svg>
-          </button>
+          <p className="text-xs mt-2 text-center text-[#374151]">
+            Built by{' '}
+            {LINKS.map(([label, href], i) => (
+              <span key={label}>
+                {i > 0 && ' · '}
+                <a href={href} target="_blank" rel="noopener noreferrer" className="text-faint hover:text-accent transition-colors">{label}</a>
+              </span>
+            ))}
+          </p>
         </div>
-        <p className="hidden md:block text-xs mt-1.5 text-center" style={{ color: '#4b5563' }}>
-          Enter to send · Shift+Enter for newline
-        </p>
-        <p className="text-xs mt-2 text-center" style={{ color: '#374151' }}>
-          Built by{' '}
-          <a
-            href="https://github.com/alled0"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ color: '#4b5563' }}
-            onMouseEnter={e => e.currentTarget.style.color = '#c8a96e'}
-            onMouseLeave={e => e.currentTarget.style.color = '#4b5563'}
-          >
-            @alled0
-          </a>
-          {' · '}
-          <a
-            href="https://www.linkedin.com/in/alwaleed-meshal-almutairi-8a48ab263/"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ color: '#4b5563' }}
-            onMouseEnter={e => e.currentTarget.style.color = '#c8a96e'}
-            onMouseLeave={e => e.currentTarget.style.color = '#4b5563'}
-          >
-            LinkedIn
-          </a>
-          {' · '}
-          <a
-            href="https://github.com/alled0/talktopdf"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ color: '#4b5563' }}
-            onMouseEnter={e => e.currentTarget.style.color = '#c8a96e'}
-            onMouseLeave={e => e.currentTarget.style.color = '#4b5563'}
-          >
-            GitHub
-          </a>
-        </p>
       </div>
-    </div>
+    </main>
   )
 }

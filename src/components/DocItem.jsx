@@ -24,8 +24,7 @@ export default function DocItem({ doc, semanticEnabled, onRemove }) {
 
   const meta = [
     formatBytes(doc.size),
-    doc.pageCount ? `${doc.pageCount} page${doc.pageCount === 1 ? '' : 's'}` : null,
-    !reading ? `${doc.chunkCount} chunks` : null
+    doc.pageCount ? `${doc.pageCount} page${doc.pageCount === 1 ? '' : 's'}` : null
   ].filter(Boolean).join(' · ')
 
   return (
@@ -36,7 +35,7 @@ export default function DocItem({ doc, semanticEnabled, onRemove }) {
 
       <div className="flex-1 min-w-0">
         <div className="text-xs font-medium text-ink truncate" title={doc.name}>{doc.name}</div>
-        <div className="text-[11px] text-subtle mt-0.5 truncate">{meta}</div>
+        <div className="text-[11px] text-subtle mt-0.5 truncate" title={reading ? undefined : `${doc.chunkCount} searchable chunks`}>{meta}</div>
 
         {reading && (
           <>
