@@ -17,6 +17,9 @@
   --mint: 93 186 160;
   --violet: 139 124 248;
   --danger: 252 165 165;
+  --danger-surface: 45 26 26;
+  --danger-line: 139 48 48;
+  --dim: 55 65 81;
   color-scheme: dark;
 }
 
@@ -44,16 +47,16 @@ html, body, #root {
 }
 
 .custom-scrollbar::-webkit-scrollbar-track {
-  background: #0e0f11;
+  background: rgb(var(--bg));
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #2d3040;
+  background: rgb(var(--line-strong));
   border-radius: 2px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #c8a96e;
+  background: rgb(var(--accent));
 }
 
 /* Fade in animation for new messages */

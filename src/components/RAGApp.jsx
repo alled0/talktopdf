@@ -251,7 +251,7 @@ export default function RAGApp() {
     <div className="flex h-screen overflow-hidden bg-bg font-mono">
       {error && (
         <div role="alert"
-          className="fixed top-4 right-4 z-[60] flex items-start gap-3 p-4 rounded-lg shadow-lg max-w-sm fade-in bg-[#2d1a1a] border border-[#8b3030] text-danger">
+          className="fixed top-4 right-4 z-[60] flex items-start gap-3 p-4 rounded-lg shadow-lg max-w-sm fade-in bg-danger-surface border border-danger-line text-danger">
           <span className="flex-1 text-sm">{error}</span>
           <button onClick={() => setError(null)} aria-label="Dismiss" className="text-danger/70 hover:text-danger text-lg leading-none">&times;</button>
         </div>

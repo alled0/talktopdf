@@ -207,7 +207,7 @@ export default function ChatArea({
           <p className="hidden md:block text-xs mt-1.5 text-center text-faint">
             Enter to send · Shift+Enter for a new line
           </p>
-          <p className="text-xs mt-2 text-center text-[#374151]">
+          <p className="text-xs mt-2 text-center text-dim">
             Built by{' '}
             {LINKS.map(([label, href], i) => (
               <span key={label}>

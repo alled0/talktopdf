@@ -1,8 +1,8 @@
 // Language-aware text normalization and tokenization for keyword search.
 // Works for any script; adds light handling for English, Arabic and CJK.
 
-const LATIN_MARKS = /[̀-ͯ]/g
-const ARABIC_MARKS = /[ؐ-ًؚ-ٰٟۖ-ۭـ]/g // tashkeel + tatweel
+const LATIN_MARKS = /[\u0300-\u036f]/g
+const ARABIC_MARKS = /[\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06ED\u0640]/g // tashkeel + tatweel
 const TOKEN_SPLIT = /[^\p{L}\p{M}\p{N}]+/u
 const CJK_RUN = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]+|[^\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]+/gu
 const CJK_CHAR = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u
@@ -58,7 +58,7 @@ function stemArabic(w) {
 
 function stem(token) {
   if (/^[a-z]+$/.test(token)) return stemEnglish(token)
-  if (/^[ء-ي]+$/.test(token)) return stemArabic(token)
+  if (/^[\u0621-\u064A]+$/.test(token)) return stemArabic(token)
   return token
 }
 

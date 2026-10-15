@@ -6,6 +6,7 @@ import { citedNumbers, linkCitations, stripCitations } from '../lib/citations.js
 import { sourceShortLabel } from '../lib/format.js'
 
 const REMARK_PLUGINS = [remarkGfm]
+const NO_SOURCES = []
 
 const MODE_LABELS = {
   full: 'Read the whole document',
@@ -56,7 +57,7 @@ function CopyButton({ text }) {
 }
 
 function AssistantMessage({ message, onOpenSource, onRetry }) {
-  const sources = message.sources || []
+  const sources = message.sources ?? NO_SOURCES
   const { content, status } = message
 
   const markdown = useMemo(() => linkCitations(content, sources.length), [content, sources.length])

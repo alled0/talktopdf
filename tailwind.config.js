@@ -25,6 +25,9 @@ export default {
         mint: token('mint'),
         violet: token('violet'),
         danger: token('danger'),
+        'danger-surface': token('danger-surface'),
+        'danger-line': token('danger-line'),
+        dim: token('dim'),
       },
       fontFamily: {
         mono: ['"DM Mono"', 'monospace'],

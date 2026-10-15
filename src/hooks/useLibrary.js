@@ -88,6 +88,8 @@ export function useLibrary({ semanticEnabled, onError }) {
       if (getEmbedState().status === 'error') resetEmbedder()
       if (library.size) {
         warmUpEmbedder() // restored vectors still need the model to embed questions
+        // Starts background work; it only updates state after awaiting the worker.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         embedPending()
       }
     }

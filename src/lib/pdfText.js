@@ -1,8 +1,8 @@
 // Pure helpers that turn pdf.js text items into clean page text.
 
-const RTL_CHARS = /[֐-ࣿיִ-﷿ﹰ-﻿]/g
-const LTR_CHARS = /[A-Za-z0-9À-ɏͰ-ϿЀ-ӿ]/g
-const PRESENTATION_FORMS = /[ﭐ-﷿ﹰ-ﻼ]+/g
+const RTL_CHARS = /[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFC]/g // Hebrew, Arabic (+ presentation forms)
+const LTR_CHARS = /[A-Za-z0-9\u00C0-\u024F\u0370-\u03FF\u0400-\u04FF]/g // Latin, Greek, Cyrillic, digits
+const PRESENTATION_FORMS = /[\uFB50-\uFDFF\uFE70-\uFEFC]+/g
 
 const count = (text, re) => text.match(re)?.length || 0
 const strongType = str => (count(str, RTL_CHARS) ? 'R' : count(str, LTR_CHARS) ? 'L' : 'N')
@@ -53,7 +53,7 @@ function lineText(items) {
   }
   return text
     .replace(PRESENTATION_FORMS, s => s.normalize('NFKC'))
-    .replace(/\s+([ً-ٰٟ])/g, '$1') // isolated harakat normalize to " " + mark
+    .replace(/\s+([\u064B-\u065F\u0670])/g, '$1') // isolated harakat normalize to " " + mark
     .replace(/\s+/g, ' ')
     .trim()
 }
