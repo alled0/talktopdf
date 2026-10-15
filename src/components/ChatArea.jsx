@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import Message from './Message.jsx'
+import SettingsPanel from './SettingsPanel.jsx'
+import { SettingsIcon } from './Icons.jsx'
 
 const suggestions = [
   'Give me a summary',
@@ -16,11 +18,13 @@ export default function ChatArea({
   onApiKeyChange,
   hasDocuments,
   usageLimitReached,
-  proxyUsage,
+  freeRemaining,
   freeLimit,
   onToggleSidebar
 }) {
   const [input, setInput] = useState('')
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const closeSettings = useCallback(() => setSettingsOpen(false), [])
   const messagesEndRef = useRef(null)
   const textareaRef = useRef(null)
 
@@ -64,6 +68,7 @@ export default function ChatArea({
         style={{ backgroundColor: '#16181c', borderBottom: '1px solid #1e2028' }}>
         <button
           onClick={onToggleSidebar}
+          aria-label="Open documents"
           className="flex items-center justify-center w-8 h-8 rounded-lg transition-colors flex-shrink-0"
           style={{ color: '#9ca3af' }}
           onMouseEnter={e => e.currentTarget.style.color = '#e2e8f0'}
@@ -83,7 +88,21 @@ export default function ChatArea({
             docs ready
           </span>
         )}
+        <button onClick={() => setSettingsOpen(true)} aria-label="Settings"
+          className={`${hasDocuments ? '' : 'ml-auto '}w-8 h-8 rounded-lg flex items-center justify-center text-muted hover:text-ink transition-colors`}>
+          <SettingsIcon />
+        </button>
       </div>
+
+      {settingsOpen && (
+        <SettingsPanel
+          onClose={closeSettings}
+          apiKey={apiKey}
+          onApiKeyChange={onApiKeyChange}
+          freeRemaining={freeRemaining}
+          freeLimit={freeLimit}
+        />
+      )}
 
       <div className="flex-1 overflow-y-auto custom-scrollbar px-3 md:px-6 py-4 space-y-6">
         {messages.length === 0 ? (
@@ -137,10 +156,10 @@ export default function ChatArea({
         ) : (
           <>
             {messages.map((msg, i) => (
-              <Message key={i} message={msg} />
+              msg.content ? <Message key={i} message={msg} /> : null
             ))}
 
-            {isThinking && (
+            {isThinking && !messages[messages.length - 1]?.content && (
               <div className="flex gap-3 fade-in">
                 <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
                   style={{ backgroundColor: '#5dbaa022', color: '#5dbaa0', border: '1px solid #5dbaa044' }}>
@@ -163,15 +182,25 @@ export default function ChatArea({
       </div>
 
       <div className="flex-shrink-0 px-3 md:px-4 pb-4 pt-2" style={{ borderTop: '1px solid #1e2028' }}>
-        {usageLimitReached ? (
-          <p className="text-xs mb-2 text-center" style={{ color: '#fca5a5' }}>
-            You've used your {freeLimit} free questions for today. Add your Groq API key for unlimited access.
-          </p>
-        ) : !apiKey ? (
-          <p className="text-xs mb-2 text-center" style={{ color: '#6b7280' }}>
-            {freeLimit - proxyUsage} free question{freeLimit - proxyUsage !== 1 ? 's' : ''} remaining today
-          </p>
-        ) : null}
+        <div className="flex items-center justify-center gap-2 mb-2 text-xs">
+          {usageLimitReached ? (
+            <p className="text-danger">
+              You've used today's {freeLimit} free questions.{' '}
+              <button onClick={() => setSettingsOpen(true)} className="underline hover:text-ink">Add your free Groq key</button>
+              {' '}to keep going.
+            </p>
+          ) : apiKey ? (
+            <p className="text-subtle">Using your Groq key · unlimited</p>
+          ) : (
+            <p className="text-subtle">
+              {freeRemaining} free question{freeRemaining !== 1 ? 's' : ''} left today
+            </p>
+          )}
+          <button onClick={() => setSettingsOpen(true)} aria-label="Settings"
+            className="hidden md:inline-flex items-center gap-1 text-faint hover:text-accent transition-colors">
+            · <SettingsIcon size={12} /> Settings
+          </button>
+        </div>
         {!hasDocuments && (
           <p className="text-xs mb-2 text-center" style={{ color: '#6b7280' }}>
             Upload a document first
@@ -180,6 +209,7 @@ export default function ChatArea({
         <div className="flex gap-2 items-end p-2 rounded-xl" style={{ backgroundColor: '#16181c', border: '1px solid #2d3040' }}>
           <button
             onClick={onToggleSidebar}
+            aria-label="Add documents"
             className="md:hidden flex-shrink-0 w-9 h-9 rounded-lg flex items-center justify-center transition-colors duration-150"
             style={{ color: '#6b7280' }}
             onMouseEnter={e => e.currentTarget.style.color = '#c8a96e'}
@@ -208,6 +238,7 @@ export default function ChatArea({
           <button
             onClick={handleSend}
             disabled={!canSend}
+            aria-label="Send"
             className="flex-shrink-0 w-9 h-9 rounded-lg flex items-center justify-center transition-all duration-150"
             style={{
               backgroundColor: canSend ? '#c8a96e' : '#1e2028',

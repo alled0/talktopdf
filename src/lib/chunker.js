@@ -1,4 +1,4 @@
-export function chunkText(text, docName) {
+export function chunkText(text, docName, docId) {
   const TARGET = 300
   const OVERLAP = 50
 
@@ -13,7 +13,7 @@ export function chunkText(text, docName) {
     const end = Math.min(start + TARGET, words.length)
     const slice = words.slice(start, end).join(' ')
 
-    if (slice.trim()) chunks.push({ text: slice, doc: docName, chunk: idx++, vec: null })
+    if (slice.trim()) chunks.push({ text: slice, doc: docName, docId, chunk: idx++, vec: null })
 
     if (end >= words.length) break
     start = end - OVERLAP

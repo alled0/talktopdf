@@ -38,9 +38,10 @@ export default function DocItem({ doc, onRemove }) {
 
         <button
           onClick={(e) => { e.stopPropagation(); onRemove() }}
-          className="opacity-0 group-hover:opacity-100 transition-opacity duration-150 rounded p-0.5 hover:bg-red-900/30"
+          className="md:opacity-0 md:group-hover:opacity-100 focus:opacity-100 transition-opacity duration-150 rounded p-1 hover:bg-red-900/30"
           style={{ color: '#6b7280' }}
           title="Remove"
+          aria-label={`Remove ${doc.name}`}
         >
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
             <line x1="18" y1="6" x2="6" y2="18" />

@@ -2,6 +2,24 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --bg: 14 15 17;
+  --surface: 22 24 28;
+  --raised: 26 28 34;
+  --elevated: 30 32 40;
+  --line: 30 32 40;
+  --line-strong: 45 48 64;
+  --ink: 226 232 240;
+  --muted: 156 163 175;
+  --subtle: 107 114 128;
+  --faint: 75 85 99;
+  --accent: 200 169 110;
+  --mint: 93 186 160;
+  --violet: 139 124 248;
+  --danger: 252 165 165;
+  color-scheme: dark;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -10,9 +28,14 @@ html, body, #root {
   height: 100%;
   margin: 0;
   padding: 0;
-  background-color: #0e0f11;
-  color: #e2e8f0;
+  background-color: rgb(var(--bg));
+  color: rgb(var(--ink));
   font-family: 'DM Mono', monospace;
+}
+
+:focus-visible {
+  outline: 2px solid rgb(var(--accent) / 0.7);
+  outline-offset: 2px;
 }
 
 /* Custom thin scrollbar */

@@ -15,6 +15,9 @@ async function extractPDF(file) {
     if (text) pages.push(`[Page ${i}]\n${text}`)
   }
 
+  if (pages.length === 0) {
+    throw new Error('No selectable text found. This looks like a scanned PDF.')
+  }
   return pages.join('\n\n')
 }
 

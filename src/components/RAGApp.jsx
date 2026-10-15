@@ -1,27 +1,50 @@
-import { useState, useCallback, useMemo, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import Sidebar from './Sidebar.jsx'
 import ChatArea from './ChatArea.jsx'
 import { extractFile } from '../lib/pdfParser.js'
 import { chunkText } from '../lib/chunker.js'
 import { buildVocab, buildIDF, tfidf, retrieve } from '../lib/tfidf.js'
-import { askLLM, buildSystemPrompt } from '../lib/llm.js'
+import { streamAnswer } from '../lib/llm.js'
+import { FREE_DAILY_ANSWERS } from '../lib/config.js'
+
+const KEY_STORAGE = 'talktopdf_groq_key'
+const freeStorageKey = () => `talktopdf_free_remaining_${new Date().toISOString().slice(0, 10)}`
+
+function readStorage(key, fallback) {
+  try { return localStorage.getItem(key) ?? fallback } catch { return fallback }
+}
+
+function writeStorage(key, value) {
+  try {
+    if (value === null) localStorage.removeItem(key)
+    else localStorage.setItem(key, value)
+  } catch {
+    // storage unavailable (private mode); the app still works for this session
+  }
+}
 
 export default function RAGApp() {
   const [docs, setDocs] = useState([])
   const [chunks, setChunks] = useState([])
   const indexRef = useRef({ vocab: new Map(), idf: new Map(), chunks: [] })
+  const removedRef = useRef(new Set())
   const [messages, setMessages] = useState([])
   const [isThinking, setIsThinking] = useState(false)
-  const [apiKey, setApiKey] = useState('')
+  const [apiKey, setApiKey] = useState(() => readStorage(KEY_STORAGE, ''))
   const [error, setError] = useState(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
-
-  const FREE_LIMIT = 10
-  const usageKey = useMemo(() => `talktopdf_usage_${new Date().toISOString().slice(0, 10)}`, [])
-  const [proxyUsage, setProxyUsage] = useState(() =>
-    parseInt(localStorage.getItem(`talktopdf_usage_${new Date().toISOString().slice(0, 10)}`) || '0', 10)
+  const [freeRemaining, setFreeRemaining] = useState(() =>
+    Number(readStorage(freeStorageKey(), FREE_DAILY_ANSWERS))
   )
-  const usageLimitReached = !apiKey && proxyUsage >= FREE_LIMIT
+  const usageLimitReached = !apiKey && freeRemaining <= 0
+
+  useEffect(() => { writeStorage(KEY_STORAGE, apiKey || null) }, [apiKey])
+
+  const updateFreeRemaining = useCallback((remaining) => {
+    if (remaining === null || Number.isNaN(remaining)) return
+    setFreeRemaining(remaining)
+    writeStorage(freeStorageKey(), String(remaining))
+  }, [])
 
   const rebuildIndex = useCallback((allChunks) => {
     if (allChunks.length === 0) {
@@ -45,7 +68,7 @@ export default function RAGApp() {
   const handleFilesAdded = useCallback(async (files) => {
     setSidebarOpen(false)
     for (const file of files) {
-      const docId = `${file.name}-${Date.now()}`
+      const docId = `${file.name}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 
       setDocs(prev => [...prev, {
         id: docId,
@@ -57,7 +80,8 @@ export default function RAGApp() {
 
       try {
         const text = await extractFile(file)
-        const docChunks = chunkText(text, file.name)
+        const docChunks = chunkText(text, file.name, docId)
+        if (removedRef.current.has(docId)) continue
 
         rebuildIndex([...indexRef.current.chunks, ...docChunks])
 
@@ -74,64 +98,54 @@ export default function RAGApp() {
   }, [rebuildIndex])
 
   const handleRemoveDoc = useCallback((docId) => {
-    const docToRemove = docs.find(d => d.id === docId)
-    if (!docToRemove) return
-
+    removedRef.current.add(docId)
     setDocs(prev => prev.filter(d => d.id !== docId))
-    rebuildIndex(indexRef.current.chunks.filter(c => c.doc !== docToRemove.name))
-  }, [docs, rebuildIndex])
+    rebuildIndex(indexRef.current.chunks.filter(c => c.docId !== docId))
+  }, [rebuildIndex])
 
   const handleSendMessage = useCallback(async (userText) => {
     if (!userText.trim() || isThinking || usageLimitReached) return
 
+    const { vocab, idf, chunks: indexedChunks } = indexRef.current
+    if (indexedChunks.length === 0) return
+
     const userMsg = { role: 'user', content: userText }
-    setMessages(prev => [...prev, userMsg])
+    const history = messages.filter(m => m.content)
+    setMessages(prev => [...prev, userMsg, { role: 'assistant', content: '', citations: [] }])
     setIsThinking(true)
 
+    const setAnswer = (patch) => setMessages(prev => {
+      const next = [...prev]
+      next[next.length - 1] = { ...next[next.length - 1], ...patch }
+      return next
+    })
+
     try {
-      let responseText
-      let citations = []
+      const queryVec = tfidf(userText, vocab, idf)
+      let retrieved = retrieve(queryVec, indexedChunks, 6, 0.01)
+      if (retrieved.length === 0) retrieved = indexedChunks.slice(0, 6)
 
-      const { vocab, idf, chunks: indexedChunks } = indexRef.current
-      if (indexedChunks.length > 0) {
-        console.log('all chunks:', indexedChunks)
-        const queryVec = tfidf(userText, vocab, idf)
-        console.log('query vec:', queryVec)
-        let retrieved = retrieve(queryVec, indexedChunks, 6, 0.01)
-        if (retrieved.length === 0) retrieved = indexedChunks.slice(0, 6)
-        console.log('retrieved:', retrieved)
+      const sources = retrieved.map(chunk => ({ label: `${chunk.doc}, chunk ${chunk.chunk}`, text: chunk.text }))
+      const citations = retrieved.map(chunk => ({ doc: chunk.doc.replace(/\.[^.]+$/, ''), chunk: chunk.chunk }))
 
-        citations = retrieved.map(chunk => ({
-          doc: chunk.doc.replace(/\.[^.]+$/, ''),
-          chunk: chunk.chunk
-        }))
-
-        const systemPrompt = buildSystemPrompt(retrieved)
-        console.log('systemPrompt:', systemPrompt)
-        const history = [...messages, userMsg]
-        responseText = await askLLM(apiKey, 'llama-3.3-70b-versatile', history, systemPrompt)
-      } else {
-        responseText = "Please upload some documents first so I can answer questions based on their content."
-      }
-
-      if (!apiKey) {
-        const next = proxyUsage + 1
-        localStorage.setItem(usageKey, String(next))
-        setProxyUsage(next)
-      }
-
-      const assistantMsg = {
-        role: 'assistant',
-        content: responseText,
-        citations
-      }
-      setMessages(prev => [...prev, assistantMsg])
+      const { remaining } = await streamAnswer({
+        apiKey,
+        question: userText,
+        history,
+        sources,
+        scope: 'specific',
+        onText: text => setAnswer({ content: text })
+      })
+      setAnswer({ citations })
+      updateFreeRemaining(remaining)
     } catch (err) {
-      setError(`API Error: ${err.message}`)
+      if (err.limitReached) updateFreeRemaining(0)
+      setMessages(prev => prev.slice(0, -1))
+      setError(err.message)
     } finally {
       setIsThinking(false)
     }
-  }, [apiKey, messages, isThinking, usageLimitReached, proxyUsage, usageKey])
+  }, [apiKey, messages, isThinking, usageLimitReached, updateFreeRemaining])
 
   const totalWords = chunks.reduce((sum, c) => sum + c.text.split(/\s+/).length, 0)
   const estimatedTokens = Math.round(totalWords * 1.3)
@@ -140,9 +154,10 @@ export default function RAGApp() {
     <div className="flex h-screen overflow-hidden" style={{ backgroundColor: '#0e0f11', fontFamily: "'DM Mono', monospace" }}>
       {error && (
         <div className="fixed top-4 right-4 z-50 flex items-start gap-3 p-4 rounded-lg shadow-lg max-w-sm fade-in"
+          role="alert"
           style={{ backgroundColor: '#2d1a1a', border: '1px solid #8b3030', color: '#fca5a5' }}>
           <span className="flex-1 text-sm">{error}</span>
-          <button onClick={() => setError(null)} className="text-red-400 hover:text-red-200 text-lg leading-none">&times;</button>
+          <button onClick={() => setError(null)} aria-label="Dismiss" className="text-red-400 hover:text-red-200 text-lg leading-none">&times;</button>
         </div>
       )}
 
@@ -172,10 +187,10 @@ export default function RAGApp() {
         onSendMessage={handleSendMessage}
         apiKey={apiKey}
         onApiKeyChange={setApiKey}
-        hasDocuments={docs.length > 0}
+        hasDocuments={chunks.length > 0}
         usageLimitReached={usageLimitReached}
-        proxyUsage={proxyUsage}
-        freeLimit={FREE_LIMIT}
+        freeRemaining={freeRemaining}
+        freeLimit={FREE_DAILY_ANSWERS}
         onToggleSidebar={() => setSidebarOpen(s => !s)}
       />
     </div>
