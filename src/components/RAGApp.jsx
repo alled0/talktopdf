@@ -9,7 +9,7 @@ import { embedQuery } from '../lib/embeddings.js'
 import { coverageSelect, retrieve } from '../lib/retrieval.js'
 import { isBroadQuestion } from '../lib/query.js'
 import { rewriteQuery, streamAnswer, suggestQuestions } from '../lib/llm.js'
-import { EMBED_MODEL_SIZE_MB, FREE_DAILY_ANSWERS } from '../lib/config.js'
+import { EMBED_MODEL_SIZE_MB } from '../lib/config.js'
 import { readStorage, writeStorage } from '../lib/storage.js'
 import { filterSupported } from '../lib/files.js'
 import { loadChat, saveChat } from '../lib/db.js'
@@ -32,7 +32,7 @@ function PrivacySection({ onClearAll }) {
       <p className="text-xs leading-relaxed text-muted">
         Files are parsed and indexed on this device. Your documents, their search index and this
         conversation are saved only in this browser. Questions and the passages used to answer them are
-        sent to Groq to generate answers.
+        sent to the AI provider (Groq) to generate answers.
       </p>
       <button
         onClick={async () => {
@@ -61,9 +61,11 @@ export default function RAGApp() {
   const [isThinking, setIsThinking] = useState(false)
   const [activeSource, setActiveSource] = useState(null) // { messageId, n }
   const [suggestions, setSuggestions] = useState({ key: '', questions: [] })
-  const [freeRemaining, setFreeRemaining] = useState(() =>
-    Number(readStorage(freeStorageKey(), FREE_DAILY_ANSWERS))
-  )
+  // Free questions this visitor has left today, as last reported by the proxy (null = unknown/unlimited).
+  const [freeRemaining, setFreeRemaining] = useState(() => {
+    const saved = readStorage(freeStorageKey(), null)
+    return saved === null ? null : Number(saved)
+  })
   const [chatLoaded, setChatLoaded] = useState(false)
   const [dragging, setDragging] = useState(false)
   const abortRef = useRef(null)
@@ -71,7 +73,7 @@ export default function RAGApp() {
 
   const embedState = useEmbedState()
   const { library, docs, stats, addFiles, removeDoc, clearAll } = useLibrary({ semanticEnabled, onError: setError })
-  const usageLimitReached = !apiKey && freeRemaining <= 0
+  const usageLimitReached = !apiKey && freeRemaining === 0
   const readyDocs = docs.filter(d => d.status === 'ready')
   const libraryKey = readyDocs.map(d => d.id).join('|')
 
@@ -132,9 +134,9 @@ export default function RAGApp() {
   }, [clearAll])
 
   const updateFreeRemaining = useCallback((remaining) => {
-    if (remaining === null || Number.isNaN(remaining)) return
-    setFreeRemaining(remaining)
-    writeStorage(freeStorageKey(), String(remaining))
+    const value = remaining === null || Number.isNaN(remaining) ? null : remaining
+    setFreeRemaining(value)
+    writeStorage(freeStorageKey(), value === null ? null : String(value))
   }, [])
 
   // Starter questions written from a sample of the documents, refreshed when the library changes.
@@ -188,7 +190,7 @@ export default function RAGApp() {
       const result = retrieve(library, { query, queryVec, scope })
       patch({ status: 'streaming', query, sources: result.sources, mode: result.mode, lowConfidence: result.lowConfidence })
 
-      const { remaining } = await streamAnswer({
+      const { remaining, model } = await streamAnswer({
         apiKey,
         question,
         history,
@@ -197,14 +199,14 @@ export default function RAGApp() {
         signal: controller.signal,
         onText: content => patch({ content })
       })
-      patch({ status: 'done' })
-      updateFreeRemaining(remaining)
+      patch({ status: 'done', model })
+      if (!apiKey) updateFreeRemaining(remaining)
     } catch (err) {
       if (err.name === 'AbortError') {
         patch({ status: 'stopped' })
       } else {
-        if (err.limitReached) updateFreeRemaining(0)
-        patch({ status: 'error', error: err.message })
+        if (err.code === 'limit') updateFreeRemaining(0)
+        patch({ status: 'error', error: err.message, needsKey: Boolean(err.needsOwnKey) })
       }
     } finally {
       abortRef.current = null
@@ -300,7 +302,6 @@ export default function RAGApp() {
         docCount={readyDocs.length}
         usageLimitReached={usageLimitReached}
         freeRemaining={freeRemaining}
-        freeLimit={FREE_DAILY_ANSWERS}
         suggestions={suggestions.key === libraryKey ? suggestions.questions : null}
         onToggleSidebar={() => setSidebarOpen(s => !s)}
         onOpenSettings={() => setSettingsOpen(true)}
@@ -316,7 +317,6 @@ export default function RAGApp() {
           apiKey={apiKey}
           onApiKeyChange={setApiKey}
           freeRemaining={freeRemaining}
-          freeLimit={FREE_DAILY_ANSWERS}
         >
           <div className="px-5 py-4 border-t border-line space-y-2">
             <label className="flex items-start justify-between gap-4 cursor-pointer">

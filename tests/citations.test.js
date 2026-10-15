@@ -25,3 +25,8 @@ test('turns citations into anchor links', () => {
 test('strips citations for plain-text copies', () => {
   assert.equal(stripCitations('Leave is 27 days [1][2]. Revenue grew [3, 4].'), 'Leave is 27 days. Revenue grew.')
 })
+
+test('accepts the 【n】 citation style some models use', () => {
+  assert.deepEqual(citedNumbers('Leave is 27 days【1†source】 and meals €55【2】.', 3), [1, 2])
+  assert.equal(linkCitations('Leave【1†L3-L5】.', 2), 'Leave[1](#cite-1).')
+})

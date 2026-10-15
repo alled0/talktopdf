@@ -20,8 +20,10 @@ is your question and the few passages needed to answer it.
 - **Feels like a product.** Streaming answers with a stop button, retry, starter questions generated
   from your files, drag and drop anywhere, and a library and chat that survive a reload (IndexedDB).
   Works on mobile.
-- **Free tier without a key.** A Vercel function proxies to Groq with a server-side per-IP daily
-  quota. Users can add their own free Groq key for unlimited questions.
+- **Free to use, no key needed.** A Vercel function answers with Groq's `gpt-oss-120b`. When a
+  model is busy, used up or retired, it falls back automatically to `gpt-oss-20b` (Groq's free
+  quotas are per model, so this doubles capacity) and optionally to Gemini. Visitors can add their
+  own free Groq key in one click for a personal quota.
 
 ## How it works
 
@@ -40,8 +42,8 @@ flowchart LR
     E --> S
     S -->|"RRF + MMR"| X["Numbered excerpts"]
   end
-  X --> P["api/chat:<br/>quota + prompt"]
-  P --> G["Groq · Llama 3.3 70B"]
+  X --> P["api/chat:<br/>prompt + fair-use guard"]
+  P --> G["Groq gpt-oss-120b<br/>→ gpt-oss-20b → Gemini (optional)"]
   G -->|"streamed answer with citations"| UI["Chat UI"]
 ```
 
@@ -52,7 +54,7 @@ flowchart LR
 | Keyword index | Incremental Okapi BM25. The tokenizer handles Arabic normalization, light stemming, stopwords and CJK bigrams. | [`bm25.js`](src/lib/bm25.js), [`text.js`](src/lib/text.js) |
 | Semantic index | `Xenova/multilingual-e5-small` (q8, about 135 MB, downloaded once) in a Web Worker | [`embed.worker.js`](src/workers/embed.worker.js) |
 | Retrieve | RRF fusion, then a relevance cutoff, then MMR diversity, then neighbor expansion. Whole-document mode for short files. Coverage sampling for broad questions. | [`retrieval.js`](src/lib/retrieval.js) |
-| Answer | The same prompt builder serves the proxy and the own-key path, and answers stream over SSE | [`prompts.js`](src/lib/prompts.js), [`llm.js`](src/lib/llm.js), [`api/chat.js`](api/chat.js) |
+| Answer | The same prompt builder serves the proxy and the own-key path. Requests fall back across models and providers on rate limits, outages or retired models, and answers stream over SSE. | [`prompts.js`](src/lib/prompts.js), [`providers.js`](src/lib/providers.js), [`api/chat.js`](api/chat.js) |
 
 ## Retrieval benchmark
 
@@ -93,14 +95,24 @@ Without a server key you can still use the app by pasting your own Groq key in *
 ## Deploying to Vercel
 
 1. Import the repository. The framework preset is Vite.
-2. Set `GROQ_API_KEY`.
-3. Optional: add an Upstash Redis or Vercel KV store and set `UPSTASH_REDIS_REST_URL` and
-   `UPSTASH_REDIS_REST_TOKEN` (or the `KV_REST_API_*` variables). This makes the per-IP daily limit
-   persistent. Without it, the limit is kept in memory per server instance.
+2. Set `GROQ_API_KEY` ([free key](https://console.groq.com/keys)).
 
-The free tier allows 10 answers and 40 helper calls (query rewrites, starter questions) per IP per
-day. You can change these in [`src/lib/config.js`](src/lib/config.js). The proxy fixes the model,
-builds the prompt itself and caps the payload size, so it can't be used as a general LLM relay.
+| Variable | Default | Purpose |
+|---|---|---|
+| `GROQ_API_KEY` | (required) | Main provider for the free tier |
+| `GEMINI_API_KEY` | (unset) | Optional overflow when Groq's free quota runs out. Note that Google may use free-tier prompts to improve its products. |
+| `GEMINI_MODEL` | `gemini-3.5-flash-lite` | Gemini model used for overflow |
+| `DAILY_QUESTIONS_PER_IP` | `25` | Fair-use guard per visitor per day; `0` turns it off |
+| `DAILY_HELPER_CALLS_PER_IP` | `100` | The same for query rewrites and starter questions |
+| `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` (or Vercel KV's `KV_REST_API_*`) | (unset) | Keeps the guard's counts in a shared store. Without them, counts live in memory per server instance. |
+
+**About capacity.** No free LLM API is unlimited. Groq's free plan gives each model roughly 200K
+tokens a day for your whole account, which is a few dozen answers per model. The per-visitor guard
+only stops one person (or bot) from using everyone's share, and visitors only see a counter when
+they are nearly out. When the shared capacity is used up, the app offers to add a personal Groq
+key, which takes about a minute and gives that visitor their own quota. The proxy decides the
+model, builds the prompt itself and caps the payload size, so it can't be used as a general LLM
+relay.
 
 ## Privacy
 
@@ -108,7 +120,8 @@ builds the prompt itself and caps the payload size, so it can't be used as a gen
 - The library (text, search index, embeddings) and the conversation are stored in the browser's
   IndexedDB. **Settings → Privacy** deletes all of it.
 - Each question sends the question, recent chat turns and the selected excerpts to Groq, either
-  directly with your key or through the proxy.
+  directly with your key or through the proxy (and to Gemini instead, if the site owner enabled
+  it as overflow).
 - A Groq key you add is stored in `localStorage` in your browser and sent only to Groq.
 
 ## Limitations
@@ -121,7 +134,7 @@ builds the prompt itself and caps the payload size, so it can't be used as a gen
 
 ## Built with
 
-React 18, Vite, Tailwind CSS, pdf.js, Transformers.js (ONNX Runtime Web), Groq, and Vercel
+React 18, Vite, Tailwind CSS, pdf.js, Transformers.js (ONNX Runtime Web), Groq (gpt-oss), and Vercel
 Functions.
 
 Built by [@alled0](https://github.com/alled0) ·

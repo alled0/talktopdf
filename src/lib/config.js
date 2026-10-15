@@ -1,14 +1,18 @@
 // Shared by the browser app and the /api/chat serverless function.
 
 export const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
+export const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions'
 
-export const ANSWER_MODEL = 'llama-3.3-70b-versatile'
-export const FAST_MODEL = 'llama-3.1-8b-instant'
-export const ANSWER_MAX_TOKENS = 1200
+// Output budgets, in tokens (gpt-oss models count their short reasoning here too).
+export const ANSWER_MAX_TOKENS = 1500
+export const FAST_MAX_TOKENS = 600
 
-// Free tier served through the proxy (per IP, per UTC day).
-export const FREE_DAILY_ANSWERS = 10
-export const FREE_DAILY_AUX = 40 // query rewrites + starter questions
+// Fair-use guard for the shared free tier, per IP per UTC day. The real ceiling is the
+// provider's account-wide daily quota; this only stops one visitor from using it all.
+// Override on the server with DAILY_QUESTIONS_PER_IP (0 = no per-person limit).
+export const DAILY_QUESTIONS_PER_IP = 25
+export const DAILY_HELPER_CALLS_PER_IP = 100 // query rewrites + starter questions
+export const SHOW_REMAINING_BELOW = 5 // only show the counter when a visitor is nearly out
 
 // Context budgets, in characters.
 export const RETRIEVAL_CHAR_BUDGET = 9000 // excerpts sent for a normal question

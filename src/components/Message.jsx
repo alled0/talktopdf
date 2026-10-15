@@ -56,7 +56,10 @@ function CopyButton({ text }) {
   )
 }
 
-function AssistantMessage({ message, onOpenSource, onRetry }) {
+// "openai/gpt-oss-120b" -> "gpt-oss-120b"
+const modelLabel = model => model?.split('/').pop()
+
+function AssistantMessage({ message, onOpenSource, onRetry, onOpenSettings }) {
   const sources = message.sources ?? NO_SOURCES
   const { content, status } = message
 
@@ -94,6 +97,12 @@ function AssistantMessage({ message, onOpenSource, onRetry }) {
       {status === 'error' && (
         <div className="flex flex-wrap items-center gap-3 px-4 py-3 rounded-xl text-sm bg-danger/5 border border-danger/30 text-danger" role="alert">
           <span className="flex-1 min-w-0">{message.error}</span>
+          {message.needsKey && onOpenSettings && (
+            <button onClick={onOpenSettings}
+              className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-md bg-accent text-bg hover:opacity-90 transition-opacity">
+              Add free key
+            </button>
+          )}
           {onRetry && (
             <button onClick={() => onRetry(message.id)}
               className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-md border border-danger/40 hover:bg-danger/10 transition-colors">
@@ -122,6 +131,9 @@ function AssistantMessage({ message, onOpenSource, onRetry }) {
             className="text-[11px] text-faint hover:text-muted transition-colors px-1">
             {MODE_LABELS[message.mode] || 'Sources'} · {sources.length} excerpt{sources.length === 1 ? '' : 's'}
           </button>
+          {message.model && (
+            <span className="text-[11px] text-faint" title={`Answered by ${message.model}`}>· {modelLabel(message.model)}</span>
+          )}
           {(status === 'done' || status === 'stopped') && content && (
             <span className="ml-1"><CopyButton text={stripCitations(content)} /></span>
           )}
@@ -131,7 +143,7 @@ function AssistantMessage({ message, onOpenSource, onRetry }) {
   )
 }
 
-function Message({ message, onOpenSource, onRetry }) {
+function Message({ message, onOpenSource, onRetry, onOpenSettings }) {
   const isUser = message.role === 'user'
 
   return (
@@ -143,7 +155,7 @@ function Message({ message, onOpenSource, onRetry }) {
             {message.content}
           </div>
         ) : (
-          <AssistantMessage message={message} onOpenSource={onOpenSource} onRetry={onRetry} />
+          <AssistantMessage message={message} onOpenSource={onOpenSource} onRetry={onRetry} onOpenSettings={onOpenSettings} />
         )}
       </div>
     </div>

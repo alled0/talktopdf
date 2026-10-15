@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { CloseIcon, ExternalIcon, EyeIcon, EyeOffIcon, KeyIcon } from './Icons.jsx'
 
 // Mounted only while open, so the draft starts from the saved key every time.
-export default function SettingsPanel({ onClose, apiKey, onApiKeyChange, freeRemaining, freeLimit, children }) {
+export default function SettingsPanel({ onClose, apiKey, onApiKeyChange, freeRemaining, children }) {
   const [draft, setDraft] = useState(apiKey)
   const [reveal, setReveal] = useState(false)
 
@@ -44,7 +44,7 @@ export default function SettingsPanel({ onClose, apiKey, onApiKeyChange, freeRem
           <p className="text-xs leading-relaxed text-muted">
             {apiKey
               ? 'You are using your own key: unlimited questions, sent straight from your browser to Groq.'
-              : `The free tier allows ${freeLimit} questions per day (${freeRemaining} left). Add your own free Groq key for unlimited use.`}
+              : `Free questions run on a shared account with a limited daily capacity${freeRemaining !== null ? ` (${freeRemaining} left for you today)` : ''}. A free Groq key of your own gives you a much larger personal quota and never runs into other visitors' usage.`}
             {' '}The key is stored only in this browser.
           </p>
 

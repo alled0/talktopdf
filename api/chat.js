@@ -1,12 +1,13 @@
-// Free-tier proxy to Groq. The browser sends a question plus the excerpts it retrieved;
-// the prompt, model and limits are decided here so the endpoint can't be used as a
-// general-purpose LLM relay.
+// Free-tier proxy. The browser sends a question plus the excerpts it retrieved; the prompt,
+// models and limits are decided here so the endpoint can't be used as a general-purpose LLM
+// relay. Requests fall back across models/providers when one is rate limited or unavailable.
 
 import {
-  GROQ_URL, FREE_DAILY_ANSWERS, FREE_DAILY_AUX,
+  DAILY_HELPER_CALLS_PER_IP, DAILY_QUESTIONS_PER_IP,
   MAX_QUESTION_CHARS, MAX_SOURCES_CHARS
 } from '../src/lib/config.js'
 import { buildAnswerRequest, buildRewriteRequest, buildSuggestRequest } from '../src/lib/prompts.js'
+import { fetchWithFallback, geminiProvider, groqProvider } from '../src/lib/providers.js'
 import { clientIp, consume, refund } from './_ratelimit.js'
 
 const MAX_BODY_BYTES = 64 * 1024
@@ -19,7 +20,26 @@ function sendJson(res, status, body, headers = {}) {
   res.end(JSON.stringify(body))
 }
 
-const fail = (res, status, message, extra = {}) => sendJson(res, status, { error: { message }, ...extra })
+const fail = (res, status, message, { code, ...extra } = {}) =>
+  sendJson(res, status, { error: { message, ...(code && { code }) }, ...extra })
+
+// GROQ_API_KEY is the main provider; GEMINI_API_KEY (optional) adds overflow capacity.
+function configuredProviders() {
+  const providers = []
+  if (process.env.GROQ_API_KEY) providers.push(groqProvider(process.env.GROQ_API_KEY))
+  if (process.env.GEMINI_API_KEY) providers.push(geminiProvider(process.env.GEMINI_API_KEY, process.env.GEMINI_MODEL || undefined))
+  return providers
+}
+
+function dailyLimit(bucket) {
+  const [raw, fallback] = bucket === 'answer'
+    ? [process.env.DAILY_QUESTIONS_PER_IP, DAILY_QUESTIONS_PER_IP]
+    : [process.env.DAILY_HELPER_CALLS_PER_IP, DAILY_HELPER_CALLS_PER_IP]
+  const value = raw === undefined || raw === '' ? fallback : Number(raw)
+  return Number.isFinite(value) && value >= 0 ? value : fallback
+}
+
+const ADD_KEY = 'Add your own free Groq key in Settings to keep going (it takes about a minute).'
 
 function parseBody(req) {
   if (typeof req.body === 'string') return JSON.parse(req.body)
@@ -79,7 +99,8 @@ export default async function handler(req, res) {
     res.setHeader('Allow', 'POST')
     return fail(res, 405, 'Method not allowed.')
   }
-  if (!process.env.GROQ_API_KEY) return fail(res, 500, 'The server is missing GROQ_API_KEY.')
+  const providers = configuredProviders()
+  if (!providers.length) return fail(res, 503, `The free service isn't configured. ${ADD_KEY}`, { code: 'capacity' })
   if (Number(req.headers['content-length'] || 0) > MAX_BODY_BYTES) return fail(res, 413, 'Request too large.')
 
   let body
@@ -93,11 +114,12 @@ export default async function handler(req, res) {
   const built = buildRequest(body)
   if (built.error) return fail(res, built.status || 400, built.error)
 
-  const limit = built.bucket === 'answer' ? FREE_DAILY_ANSWERS : FREE_DAILY_AUX
-  const quota = await consume(built.bucket, clientIp(req), limit)
-  const quotaHeaders = { 'X-Free-Remaining': String(quota.remaining) }
-  if (!quota.allowed) {
-    return fail(res, 429, `You've used today's ${limit} free questions. Add your own free Groq API key in Settings to keep going.`, { remaining: 0 })
+  // Per-visitor fair-use guard (0 disables it).
+  const limit = dailyLimit(built.bucket)
+  const quota = limit > 0 ? await consume(built.bucket, clientIp(req), limit) : null
+  const headers = quota ? { 'X-Free-Remaining': String(quota.remaining) } : {}
+  if (quota && !quota.allowed) {
+    return fail(res, 429, `You've reached today's limit of ${limit} free questions. ${ADD_KEY}`, { remaining: 0, code: 'limit' })
   }
 
   const controller = new AbortController()
@@ -105,42 +127,43 @@ export default async function handler(req, res) {
 
   let upstream
   try {
-    upstream = await fetch(GROQ_URL, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${process.env.GROQ_API_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...built.request, stream: Boolean(built.stream) }),
-      signal: controller.signal
+    upstream = await fetchWithFallback({
+      providers,
+      request: built.request,
+      stream: Boolean(built.stream),
+      signal: controller.signal,
+      onFailure: f => console.warn(`${f.provider} ${f.model} responded ${f.status}: ${f.detail.slice(0, 300)}`)
     })
   } catch (err) {
-    await refund(quota)
+    if (quota) await refund(quota)
     if (controller.signal.aborted) return
-    console.error('Groq request failed:', err)
-    return fail(res, 502, 'Could not reach the language model. Please try again.')
-  }
-
-  if (!upstream.ok) {
-    await refund(quota)
-    const detail = await upstream.text().catch(() => '')
-    console.error(`Groq responded ${upstream.status}:`, detail.slice(0, 500))
-    if (upstream.status === 429) {
-      return fail(res, 503, 'The free service is busy right now. Try again in a minute, or add your own Groq API key in Settings.')
+    console.error('All providers failed:', err.message)
+    if (err.rateLimited && (err.retryAfterMs === null || err.retryAfterMs > 120000)) {
+      return fail(res, 503, `Today's shared free AI capacity is used up. ${ADD_KEY}`, { code: 'capacity' })
+    }
+    if (err.rateLimited) {
+      return fail(res, 503, 'The free service is busy right now. Try again in a minute, or add your own free Groq key in Settings.', { code: 'busy' })
+    }
+    if (err.unauthorized) {
+      return fail(res, 503, `The free service is unavailable right now. ${ADD_KEY}`, { code: 'capacity' })
     }
     return fail(res, 502, 'The language model returned an error. Please try again.')
   }
+  headers['X-Model'] = upstream.model
 
   if (!built.stream) {
-    const data = await upstream.json()
-    return sendJson(res, 200, { content: data.choices?.[0]?.message?.content ?? '' }, quotaHeaders)
+    const data = await upstream.response.json()
+    return sendJson(res, 200, { content: data.choices?.[0]?.message?.content ?? '' }, headers)
   }
 
   res.writeHead(200, {
     'Content-Type': 'text/event-stream; charset=utf-8',
     'Cache-Control': 'no-cache, no-transform',
     'X-Accel-Buffering': 'no',
-    ...quotaHeaders
+    ...headers
   })
   try {
-    const reader = upstream.body.getReader()
+    const reader = upstream.response.body.getReader()
     for (;;) {
       const { done, value } = await reader.read()
       if (done) break

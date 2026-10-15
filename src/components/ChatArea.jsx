@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useLayoutEffect } from 'react'
 import Message from './Message.jsx'
+import { SHOW_REMAINING_BELOW } from '../lib/config.js'
 import { ArrowUpIcon, MenuIcon, PaperclipIcon, PlusIcon, SettingsIcon, StopIcon } from './Icons.jsx'
 
 const DEFAULT_SUGGESTIONS = [
@@ -28,7 +29,6 @@ export default function ChatArea({
   docCount,
   usageLimitReached,
   freeRemaining,
-  freeLimit,
   suggestions,
   onToggleSidebar,
   onOpenSettings
@@ -151,7 +151,7 @@ export default function ChatArea({
         ) : (
           <div className="space-y-6 max-w-3xl mx-auto">
             {messages.map(msg => (
-              <Message key={msg.id} message={msg} onOpenSource={onOpenSource} onRetry={onRetry} />
+              <Message key={msg.id} message={msg} onOpenSource={onOpenSource} onRetry={onRetry} onOpenSettings={onOpenSettings} />
             ))}
           </div>
         )}
@@ -159,21 +159,18 @@ export default function ChatArea({
 
       <div className="flex-shrink-0 px-3 md:px-4 pb-4 pt-2 border-t border-line">
         <div className="max-w-3xl mx-auto">
-          <div className="flex items-center justify-center gap-2 mb-2 text-xs">
-            {usageLimitReached ? (
-              <p className="text-danger text-center">
-                You've used today's {freeLimit} free questions.{' '}
-                <button onClick={onOpenSettings} className="underline hover:text-ink">Add your free Groq key</button>
-                {' '}to keep going.
-              </p>
-            ) : apiKey ? (
-              <p className="text-subtle">Using your Groq key · unlimited</p>
-            ) : (
-              <p className="text-subtle">
-                {freeRemaining} free question{freeRemaining !== 1 ? 's' : ''} left today
-              </p>
-            )}
-          </div>
+          {usageLimitReached ? (
+            <p className="mb-2 text-xs text-center text-danger">
+              You've used today's free questions.{' '}
+              <button onClick={onOpenSettings} className="underline hover:text-ink">Add your free Groq key</button>
+              {' '}to keep going.
+            </p>
+          ) : !apiKey && freeRemaining !== null && freeRemaining <= SHOW_REMAINING_BELOW ? (
+            <p className="mb-2 text-xs text-center text-subtle">
+              {freeRemaining} free question{freeRemaining !== 1 ? 's' : ''} left today ·{' '}
+              <button onClick={onOpenSettings} className="underline hover:text-ink">use your own free key</button>
+            </p>
+          ) : null}
 
           <div className="flex gap-2 items-end p-2 rounded-xl bg-surface border border-line-strong focus-within:border-accent/40 transition-colors">
             <button onClick={onToggleSidebar} aria-label="Add documents"

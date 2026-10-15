@@ -1,46 +1,61 @@
-import { GROQ_URL } from './config.js'
 import { buildAnswerRequest, buildRewriteRequest, buildSuggestRequest, parseJsonContent } from './prompts.js'
+import { fetchWithFallback, groqProvider } from './providers.js'
 
 export class ApiError extends Error {
-  constructor(message, { status, limitReached = false } = {}) {
+  /**
+   * @param {object} options
+   * @param {'limit'|'capacity'|'busy'|undefined} options.code
+   *   limit: this visitor's daily free questions are used up
+   *   capacity: the shared free tier can't serve requests (adding an own key fixes it)
+   *   busy: briefly rate limited, retrying soon should work
+   */
+  constructor(message, { status, code } = {}) {
     super(message)
     this.name = 'ApiError'
     this.status = status
-    this.limitReached = limitReached
+    this.code = code
+  }
+
+  get needsOwnKey() {
+    return this.code === 'limit' || this.code === 'capacity'
   }
 }
 
-// With a key we call Groq directly from the browser; otherwise the free proxy builds
-// the identical request server-side from the same payload.
-function send(apiKey, payload, buildGroqRequest, { stream = false, signal } = {}) {
+// With a key we call Groq directly from the browser (falling back across Groq models);
+// otherwise the free proxy builds the identical request server-side from the same payload.
+async function send(apiKey, payload, buildRequest, { stream = false, signal } = {}) {
   if (apiKey) {
-    return fetch(GROQ_URL, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...buildGroqRequest(payload), stream }),
-      signal
-    })
+    try {
+      const { response, model } = await fetchWithFallback({
+        providers: [groqProvider(apiKey)],
+        request: buildRequest(payload),
+        stream,
+        signal
+      })
+      return { response, model, remaining: null }
+    } catch (err) {
+      if (err.name === 'AbortError') throw err
+      if (err.unauthorized) throw new ApiError('Groq rejected your API key. Check it in Settings.', { status: 401 })
+      if (err.rateLimited) throw new ApiError('Your Groq key hit its rate limit. Wait a minute and try again.', { status: 429, code: 'busy' })
+      throw new ApiError(err.message, { status: err.status })
+    }
   }
-  return fetch('/api/chat', {
+
+  const response = await fetch('/api/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
     signal
   })
-}
-
-async function toError(res, apiKey) {
-  const data = await res.json().catch(() => null)
-  const detail = data?.error?.message
-  if (apiKey && res.status === 401) return new ApiError('Groq rejected your API key. Check it in Settings.', { status: 401 })
-  if (apiKey && res.status === 429) return new ApiError('Your Groq key hit its rate limit. Wait a moment and try again.', { status: 429 })
-  if (!apiKey && res.status === 429) return new ApiError(detail || 'Daily free limit reached.', { status: 429, limitReached: true })
-  return new ApiError(detail || `Request failed (${res.status}).`, { status: res.status })
-}
-
-function freeRemaining(res) {
-  const value = res.headers.get('X-Free-Remaining')
-  return value === null ? null : Number(value)
+  if (!response.ok) {
+    const data = await response.json().catch(() => null)
+    throw new ApiError(data?.error?.message || `Request failed (${response.status}).`, {
+      status: response.status,
+      code: data?.error?.code
+    })
+  }
+  const remaining = response.headers.get('X-Free-Remaining')
+  return { response, model: response.headers.get('X-Model'), remaining: remaining === null ? null : Number(remaining) }
 }
 
 async function* readEventStream(body) {
@@ -70,6 +85,7 @@ async function* readEventStream(body) {
 /**
  * Streams an answer grounded in `sources` ({label, text}). Calls onText with the
  * accumulated text as tokens arrive. Rejects with an AbortError if `signal` aborts.
+ * @returns {Promise<{text: string, remaining: number|null, model: string|null}>}
  */
 export async function streamAnswer({ apiKey, question, history, sources, scope, signal, onText }) {
   const payload = {
@@ -79,21 +95,19 @@ export async function streamAnswer({ apiKey, question, history, sources, scope, 
     sources: sources.map(s => ({ label: s.label, text: s.text })),
     scope
   }
-  const res = await send(apiKey, payload, buildAnswerRequest, { stream: true, signal })
-  if (!res.ok) throw await toError(res, apiKey)
+  const { response, model, remaining } = await send(apiKey, payload, buildAnswerRequest, { stream: true, signal })
 
   let text = ''
-  for await (const delta of readEventStream(res.body)) {
+  for await (const delta of readEventStream(response.body)) {
     text += delta
     onText?.(text)
   }
-  return { text, remaining: apiKey ? null : freeRemaining(res) }
+  return { text, remaining, model }
 }
 
-async function completeJson(apiKey, payload, buildGroqRequest, signal) {
-  const res = await send(apiKey, payload, buildGroqRequest, { signal })
-  if (!res.ok) throw await toError(res, apiKey)
-  const data = await res.json()
+async function completeJson(apiKey, payload, buildRequest, signal) {
+  const { response } = await send(apiKey, payload, buildRequest, { signal })
+  const data = await response.json()
   const content = apiKey ? data.choices?.[0]?.message?.content : data.content
   return parseJsonContent(content)
 }
