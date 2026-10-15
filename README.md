@@ -4,6 +4,10 @@ Chat with your PDFs and get answers that cite the exact page they came from. Par
 search all run **in your browser**. Your files never leave your device. The only data sent anywhere
 is your question and the few passages needed to answer it.
 
+**Live demo: [talktopdf-omega.vercel.app](https://talktopdf-omega.vercel.app)**
+
+![Answer with a clickable citation and the cited passage open](docs/screenshot.png)
+
 - **Hybrid search.** BM25 keyword search plus multilingual semantic embeddings, fused with
   Reciprocal Rank Fusion. Finds "how many days off do I get?" in a passage that only says
   "27 days of paid annual leave".
