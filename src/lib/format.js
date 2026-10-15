@@ -18,3 +18,14 @@ export function formatCount(n) {
 /** "report · p. 4" for a retrieved source. */
 export const sourceShortLabel = source =>
   `${stripExtension(source.docName)} · ${formatPages(source.pageStart, source.pageEnd) || `part ${source.part}`}`
+
+/**
+ * Models sometimes write HTML line breaks inside Markdown, which is shown as raw text.
+ * In table rows they become " · " (a newline would end the row); elsewhere real line breaks.
+ */
+export function tidyMarkdown(markdown) {
+  return markdown
+    .split('\n')
+    .map(line => line.replace(/<br\s*\/?>/gi, /^\s*\|/.test(line) ? ' · ' : '  \n'))
+    .join('\n')
+}

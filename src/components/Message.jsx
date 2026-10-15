@@ -3,7 +3,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { CheckIcon, CopyIcon, RetryIcon, SparkIcon, UserIcon } from './Icons.jsx'
 import { citedNumbers, linkCitations, stripCitations } from '../lib/citations.js'
-import { sourceShortLabel } from '../lib/format.js'
+import { sourceShortLabel, tidyMarkdown } from '../lib/format.js'
 
 const REMARK_PLUGINS = [remarkGfm]
 const NO_SOURCES = []
@@ -63,7 +63,7 @@ function AssistantMessage({ message, onOpenSource, onRetry, onOpenSettings }) {
   const sources = message.sources ?? NO_SOURCES
   const { content, status } = message
 
-  const markdown = useMemo(() => linkCitations(content, sources.length), [content, sources.length])
+  const markdown = useMemo(() => linkCitations(tidyMarkdown(content), sources.length), [content, sources.length])
   const cited = useMemo(() => citedNumbers(content, sources.length), [content, sources.length])
   const components = useMemo(() => ({
     a: ({ href, children }) => {
@@ -131,18 +131,15 @@ function AssistantMessage({ message, onOpenSource, onRetry, onOpenSettings }) {
               ))}
             </div>
           )}
-          <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] text-faint">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-faint">
             <button onClick={() => onOpenSource(message.id, cited[0] || 1)} className="hover:text-muted transition-colors">
               {MODE_LABELS[message.mode] || 'Sources'} · {sources.length} excerpt{sources.length === 1 ? '' : 's'}
             </button>
             {message.model && (
-              <span title={`Answered by ${message.model}`}>· {modelLabel(message.model)}</span>
+              <span title={`Answered by ${message.model}`}>{modelLabel(message.model)}</span>
             )}
             {(status === 'done' || status === 'stopped') && content && (
-              <>
-                <span aria-hidden="true">·</span>
-                <CopyButton text={stripCitations(content)} />
-              </>
+              <CopyButton text={stripCitations(tidyMarkdown(content))} />
             )}
           </div>
         </div>

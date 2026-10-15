@@ -58,7 +58,7 @@ export default function SettingsPanel({ onClose, apiKey, onApiKeyChange, freeRem
               autoComplete="off"
               spellCheck={false}
               aria-label="Groq API key"
-              className="flex-1 min-w-0 bg-transparent py-2.5 text-sm text-ink outline-none placeholder:text-faint"
+              className="flex-1 min-w-0 bg-transparent py-2.5 text-sm text-ink outline-none focus-visible:outline-none placeholder:text-faint"
             />
             <button type="button" onClick={() => setReveal(r => !r)}
               aria-label={reveal ? 'Hide key' : 'Show key'}
