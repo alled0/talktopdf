@@ -32,7 +32,12 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react(), apiDevServer()],
     optimizeDeps: {
-      include: ['pdfjs-dist']
+      include: ['pdfjs-dist'],
+      // onnxruntime-web resolves its .wasm files relative to its own module; keep it unbundled.
+      exclude: ['@huggingface/transformers']
+    },
+    worker: {
+      format: 'es'
     }
   }
 })

@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import Message from './Message.jsx'
-import SettingsPanel from './SettingsPanel.jsx'
 import { SettingsIcon } from './Icons.jsx'
 
 const suggestions = [
@@ -15,16 +14,14 @@ export default function ChatArea({
   isThinking,
   onSendMessage,
   apiKey,
-  onApiKeyChange,
   hasDocuments,
   usageLimitReached,
   freeRemaining,
   freeLimit,
-  onToggleSidebar
+  onToggleSidebar,
+  onOpenSettings
 }) {
   const [input, setInput] = useState('')
-  const [settingsOpen, setSettingsOpen] = useState(false)
-  const closeSettings = useCallback(() => setSettingsOpen(false), [])
   const messagesEndRef = useRef(null)
   const textareaRef = useRef(null)
 
@@ -88,21 +85,12 @@ export default function ChatArea({
             docs ready
           </span>
         )}
-        <button onClick={() => setSettingsOpen(true)} aria-label="Settings"
+        <button onClick={onOpenSettings} aria-label="Settings"
           className={`${hasDocuments ? '' : 'ml-auto '}w-8 h-8 rounded-lg flex items-center justify-center text-muted hover:text-ink transition-colors`}>
           <SettingsIcon />
         </button>
       </div>
 
-      {settingsOpen && (
-        <SettingsPanel
-          onClose={closeSettings}
-          apiKey={apiKey}
-          onApiKeyChange={onApiKeyChange}
-          freeRemaining={freeRemaining}
-          freeLimit={freeLimit}
-        />
-      )}
 
       <div className="flex-1 overflow-y-auto custom-scrollbar px-3 md:px-6 py-4 space-y-6">
         {messages.length === 0 ? (
@@ -186,7 +174,7 @@ export default function ChatArea({
           {usageLimitReached ? (
             <p className="text-danger">
               You've used today's {freeLimit} free questions.{' '}
-              <button onClick={() => setSettingsOpen(true)} className="underline hover:text-ink">Add your free Groq key</button>
+              <button onClick={onOpenSettings} className="underline hover:text-ink">Add your free Groq key</button>
               {' '}to keep going.
             </p>
           ) : apiKey ? (
@@ -196,7 +184,7 @@ export default function ChatArea({
               {freeRemaining} free question{freeRemaining !== 1 ? 's' : ''} left today
             </p>
           )}
-          <button onClick={() => setSettingsOpen(true)} aria-label="Settings"
+          <button onClick={onOpenSettings} aria-label="Settings"
             className="hidden md:inline-flex items-center gap-1 text-faint hover:text-accent transition-colors">
             · <SettingsIcon size={12} /> Settings
           </button>

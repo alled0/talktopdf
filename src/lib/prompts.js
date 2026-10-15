@@ -52,7 +52,7 @@ Given a conversation and the user's latest message, return JSON only, in this sh
 {"query": "<standalone search query>", "scope": "specific" | "broad"}
 
 - "query": the latest message rewritten so it makes sense on its own, resolving references such as "it", "they" or "the second one" using the conversation. Keep the user's language, names, numbers and key terms. Do not answer it.
-- "scope": "broad" when the message asks about the document(s) as a whole (summary, overview, main idea or argument, key takeaways, conclusions, structure). Otherwise "specific".`
+- "scope": "broad" when the message asks about the document(s) as a whole (summary, overview, main idea or argument, key takeaways, structure). Otherwise "specific".`
 
 export function buildRewriteRequest({ question, history }) {
   const convo = cleanHistory(history)

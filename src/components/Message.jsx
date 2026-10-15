@@ -1,4 +1,5 @@
 import ReactMarkdown from 'react-markdown'
+import { formatPages, stripExtension } from '../lib/format.js'
 
 function UserAvatar() {
   return (
@@ -43,13 +44,13 @@ export default function Message({ message }) {
           {isUser ? message.content : <ReactMarkdown>{message.content}</ReactMarkdown>}
         </div>
 
-        {!isUser && message.citations?.length > 0 && (
+        {!isUser && message.sources?.length > 0 && (
           <div className="flex flex-wrap gap-1.5 mt-1">
-            {message.citations.map((cit, i) => (
-              <span key={i} className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs"
-                style={{ backgroundColor: '#5dbaa015', border: '1px solid #5dbaa033', color: '#5dbaa0' }}>
-                <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: '#5dbaa0' }} />
-                {cit.doc} · {cit.chunk}
+            {message.sources.map(source => (
+              <span key={source.n} title={source.label}
+                className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs bg-mint/10 border border-mint/20 text-mint">
+                <span className="text-mint/60">{source.n}</span>
+                {stripExtension(source.docName)} · {formatPages(source.pageStart, source.pageEnd) || `part ${source.part}`}
               </span>
             ))}
           </div>

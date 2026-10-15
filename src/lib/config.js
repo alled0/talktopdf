@@ -20,4 +20,4 @@ export const MAX_HISTORY_CHARS = 2000 // per message
 
 // In-browser semantic search.
 export const EMBED_MODEL = 'Xenova/multilingual-e5-small'
-export const EMBED_MODEL_SIZE_MB = 118
+export const EMBED_MODEL_SIZE_MB = 135
