@@ -119,24 +119,32 @@ function AssistantMessage({ message, onOpenSource, onRetry, onOpenSettings }) {
       )}
 
       {sources.length > 0 && status !== 'searching' && (
-        <div className="flex flex-wrap items-center gap-1.5">
-          {cited.map(n => (
-            <button key={n} onClick={() => onOpenSource(message.id, n)} title={sources[n - 1].label}
-              className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs bg-mint/10 border border-mint/20 text-mint hover:bg-mint/20 transition-colors">
-              <span className="text-mint/60">{n}</span>
-              {sourceShortLabel(sources[n - 1])}
+        <div className="flex flex-col gap-1.5">
+          {cited.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              {cited.map(n => (
+                <button key={n} onClick={() => onOpenSource(message.id, n)} title={sources[n - 1].label}
+                  className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs bg-mint/10 border border-mint/20 text-mint hover:bg-mint/20 transition-colors">
+                  <span className="text-mint/60">{n}</span>
+                  {sourceShortLabel(sources[n - 1])}
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] text-faint">
+            <button onClick={() => onOpenSource(message.id, cited[0] || 1)} className="hover:text-muted transition-colors">
+              {MODE_LABELS[message.mode] || 'Sources'} · {sources.length} excerpt{sources.length === 1 ? '' : 's'}
             </button>
-          ))}
-          <button onClick={() => onOpenSource(message.id, cited[0] || 1)}
-            className="text-[11px] text-faint hover:text-muted transition-colors px-1">
-            {MODE_LABELS[message.mode] || 'Sources'} · {sources.length} excerpt{sources.length === 1 ? '' : 's'}
-          </button>
-          {message.model && (
-            <span className="text-[11px] text-faint" title={`Answered by ${message.model}`}>· {modelLabel(message.model)}</span>
-          )}
-          {(status === 'done' || status === 'stopped') && content && (
-            <span className="ml-1"><CopyButton text={stripCitations(content)} /></span>
-          )}
+            {message.model && (
+              <span title={`Answered by ${message.model}`}>· {modelLabel(message.model)}</span>
+            )}
+            {(status === 'done' || status === 'stopped') && content && (
+              <>
+                <span aria-hidden="true">·</span>
+                <CopyButton text={stripCitations(content)} />
+              </>
+            )}
+          </div>
         </div>
       )}
     </>
