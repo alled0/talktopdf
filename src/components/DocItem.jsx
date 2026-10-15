@@ -1,51 +1,79 @@
-export default function DocItem({ doc, onRemove }) {
+import { CloseIcon } from './Icons.jsx'
+import { formatBytes } from '../lib/format.js'
+
+const EXT_STYLES = {
+  PDF: 'bg-accent/15 text-accent',
+  TXT: 'bg-mint/15 text-mint',
+  MD: 'bg-violet/15 text-violet'
+}
+
+function ProgressBar({ value, className = 'bg-accent' }) {
+  return (
+    <div className="h-1 mt-1.5 rounded-full bg-elevated overflow-hidden"
+      role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(value * 100)}>
+      <div className={`h-full rounded-full transition-[width] duration-300 ${className}`} style={{ width: `${Math.max(4, value * 100)}%` }} />
+    </div>
+  )
+}
+
+export default function DocItem({ doc, semanticEnabled, onRemove }) {
   const ext = doc.name.split('.').pop().toUpperCase()
-  const extColors = { PDF: '#c8a96e', TXT: '#5dbaa0', MD: '#8b7cf8' }
-  const color = extColors[ext] || '#c8a96e'
+  const reading = doc.status === 'reading'
+  const embedding = !reading && semanticEnabled && doc.embedded < doc.chunkCount
+  const fullyIndexed = !reading && (!semanticEnabled || doc.embedded >= doc.chunkCount)
+
+  const meta = [
+    formatBytes(doc.size),
+    doc.pageCount ? `${doc.pageCount} page${doc.pageCount === 1 ? '' : 's'}` : null
+  ].filter(Boolean).join(' · ')
 
   return (
-    <div className="flex items-center gap-2 p-2 rounded-lg group transition-colors duration-150"
-      style={{ backgroundColor: '#1a1c22' }}
-      onMouseEnter={e => e.currentTarget.style.backgroundColor = '#1e2028'}
-      onMouseLeave={e => e.currentTarget.style.backgroundColor = '#1a1c22'}>
-
-      <div className="flex-shrink-0 w-9 h-9 rounded-md flex items-center justify-center text-xs font-bold"
-        style={{ backgroundColor: `${color}22`, color, fontFamily: 'DM Mono, monospace' }}>
+    <div className="group flex items-start gap-2.5 p-2 rounded-lg bg-raised hover:bg-elevated transition-colors duration-150">
+      <div className={`flex-shrink-0 w-9 h-9 rounded-md flex items-center justify-center text-[10px] font-bold ${EXT_STYLES[ext] || EXT_STYLES.PDF}`}>
         {ext}
       </div>
 
       <div className="flex-1 min-w-0">
-        <div className="text-xs font-medium truncate" style={{ color: '#e2e8f0' }} title={doc.name}>
-          {doc.name}
-        </div>
-        <div className="flex items-center gap-2 mt-0.5">
-          <span className="text-xs" style={{ color: '#6b7280' }}>
-            {(doc.size / 1024).toFixed(1)}KB
-          </span>
-          {doc.status === 'ready' && (
-            <span className="text-xs" style={{ color: '#6b7280' }}>· {doc.chunkCount} chunks</span>
-          )}
-        </div>
+        <div className="text-xs font-medium text-ink truncate" title={doc.name}>{doc.name}</div>
+        <div className="text-[11px] text-subtle mt-0.5 truncate" title={reading ? undefined : `${doc.chunkCount} searchable chunks`}>{meta}</div>
+
+        {reading && (
+          <>
+            <ProgressBar value={doc.progress} />
+            <div className="text-[10px] text-subtle mt-1">
+              {doc.progress > 0 ? `Reading… ${Math.round(doc.progress * 100)}%` : 'Opening…'}
+            </div>
+          </>
+        )}
+
+        {embedding && (
+          <>
+            <ProgressBar value={doc.chunkCount ? doc.embedded / doc.chunkCount : 0} className="bg-mint/70" />
+            <div className="text-[10px] text-subtle mt-1">
+              Semantic index {doc.chunkCount ? Math.round(doc.embedded / doc.chunkCount * 100) : 0}% · keyword search ready
+            </div>
+          </>
+        )}
+
+        {doc.emptyPages > 0 && !reading && (
+          <div className="text-[10px] text-accent/80 mt-1">
+            {doc.emptyPages} page{doc.emptyPages === 1 ? '' : 's'} had no selectable text (scanned?)
+          </div>
+        )}
       </div>
 
-      <div className="flex items-center gap-2">
-        {doc.status === 'processing' && (
-          <div className="w-2 h-2 rounded-full pulse-amber" style={{ backgroundColor: '#c8a96e' }} />
+      <div className="flex items-center gap-1.5 pt-1">
+        {fullyIndexed && (
+          <span className="w-2 h-2 rounded-full bg-mint" title={semanticEnabled ? 'Keyword + semantic search ready' : 'Keyword search ready'} />
         )}
-        {doc.status === 'ready' && (
-          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: '#5dbaa0' }} />
-        )}
-
+        {reading && <span className="w-2 h-2 rounded-full bg-accent pulse-amber" title="Processing" />}
         <button
-          onClick={(e) => { e.stopPropagation(); onRemove() }}
-          className="opacity-0 group-hover:opacity-100 transition-opacity duration-150 rounded p-0.5 hover:bg-red-900/30"
-          style={{ color: '#6b7280' }}
+          onClick={e => { e.stopPropagation(); onRemove() }}
+          className="md:opacity-0 md:group-hover:opacity-100 focus:opacity-100 transition-opacity duration-150 rounded p-1 text-subtle hover:text-danger hover:bg-danger/10"
           title="Remove"
+          aria-label={`Remove ${doc.name}`}
         >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
+          <CloseIcon size={12} strokeWidth={2.5} />
         </button>
       </div>
     </div>

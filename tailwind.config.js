@@ -1,4 +1,8 @@
 /** @type {import('tailwindcss').Config} */
+
+// Colors are defined as RGB channels in src/index.css so opacity modifiers work (e.g. bg-accent/10).
+const token = name => `rgb(var(--${name}) / <alpha-value>)`
+
 export default {
   content: [
     "./index.html",
@@ -7,14 +11,23 @@ export default {
   theme: {
     extend: {
       colors: {
-        bg: '#0e0f11',
-        surface: '#16181c',
-        amber: {
-          custom: '#c8a96e',
-        },
-        teal: {
-          custom: '#5dbaa0',
-        }
+        bg: token('bg'),
+        surface: token('surface'),
+        raised: token('raised'),
+        elevated: token('elevated'),
+        line: token('line'),
+        'line-strong': token('line-strong'),
+        ink: token('ink'),
+        muted: token('muted'),
+        subtle: token('subtle'),
+        faint: token('faint'),
+        accent: token('accent'),
+        mint: token('mint'),
+        violet: token('violet'),
+        danger: token('danger'),
+        'danger-surface': token('danger-surface'),
+        'danger-line': token('danger-line'),
+        dim: token('dim'),
       },
       fontFamily: {
         mono: ['"DM Mono"', 'monospace'],

@@ -2,6 +2,27 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --bg: 14 15 17;
+  --surface: 22 24 28;
+  --raised: 26 28 34;
+  --elevated: 30 32 40;
+  --line: 30 32 40;
+  --line-strong: 45 48 64;
+  --ink: 226 232 240;
+  --muted: 156 163 175;
+  --subtle: 107 114 128;
+  --faint: 75 85 99;
+  --accent: 200 169 110;
+  --mint: 93 186 160;
+  --violet: 139 124 248;
+  --danger: 252 165 165;
+  --danger-surface: 45 26 26;
+  --danger-line: 139 48 48;
+  --dim: 55 65 81;
+  color-scheme: dark;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -10,9 +31,14 @@ html, body, #root {
   height: 100%;
   margin: 0;
   padding: 0;
-  background-color: #0e0f11;
-  color: #e2e8f0;
+  background-color: rgb(var(--bg));
+  color: rgb(var(--ink));
   font-family: 'DM Mono', monospace;
+}
+
+:focus-visible {
+  outline: 2px solid rgb(var(--accent) / 0.7);
+  outline-offset: 2px;
 }
 
 /* Custom thin scrollbar */
@@ -21,16 +47,16 @@ html, body, #root {
 }
 
 .custom-scrollbar::-webkit-scrollbar-track {
-  background: #0e0f11;
+  background: rgb(var(--bg));
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #2d3040;
+  background: rgb(var(--line-strong));
   border-radius: 2px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #c8a96e;
+  background: rgb(var(--accent));
 }
 
 /* Fade in animation for new messages */
@@ -88,7 +114,74 @@ html, body, #root {
 /* AI markdown bubble styles */
 .ai-bubble p { margin-bottom: 0.75rem; line-height: 1.7; }
 .ai-bubble p:last-child { margin-bottom: 0; }
-.ai-bubble strong { color: #c8a96e; font-weight: 500; }
-.ai-bubble ol, .ai-bubble ul { padding-left: 1.25rem; margin-bottom: 0.75rem; }
+.ai-bubble strong { color: rgb(var(--accent)); font-weight: 500; }
+.ai-bubble ol, .ai-bubble ul { padding-inline-start: 1.25rem; margin-bottom: 0.75rem; }
 .ai-bubble li { margin-bottom: 0.4rem; line-height: 1.6; }
-.ai-bubble h1, .ai-bubble h2, .ai-bubble h3 { color: #e8e6e0; font-weight: 500; margin-bottom: 0.5rem; margin-top: 1rem; }
+.ai-bubble h1, .ai-bubble h2, .ai-bubble h3 { color: rgb(var(--ink)); font-weight: 500; margin-bottom: 0.5rem; margin-top: 1rem; }
+.ai-bubble h1:first-child, .ai-bubble h2:first-child, .ai-bubble h3:first-child { margin-top: 0; }
+.ai-bubble a { color: rgb(var(--mint)); text-decoration: underline; text-underline-offset: 2px; }
+.ai-bubble code { font-size: 0.85em; padding: 0.1em 0.35em; border-radius: 4px; background: rgb(var(--elevated)); }
+.ai-bubble pre { margin-bottom: 0.75rem; padding: 0.75rem; border-radius: 8px; background: rgb(var(--bg)); overflow-x: auto; }
+.ai-bubble pre code { padding: 0; background: none; }
+.ai-bubble blockquote { margin: 0 0 0.75rem; padding-left: 0.75rem; border-left: 2px solid rgb(var(--accent) / 0.4); color: rgb(var(--muted)); }
+.ai-bubble table { width: 100%; margin-bottom: 0.75rem; border-collapse: collapse; font-size: 0.85em; display: block; overflow-x: auto; }
+.ai-bubble th, .ai-bubble td { padding: 0.35rem 0.6rem; border: 1px solid rgb(var(--line-strong)); text-align: start; }
+.ai-bubble th { color: rgb(var(--accent)); font-weight: 500; }
+.ai-bubble ol { list-style: decimal; }
+.ai-bubble ul { list-style: disc; }
+
+/* Inline citation buttons rendered from [n] markers */
+.cite-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  padding: 0 0.3rem;
+  margin: 0 0.1rem;
+  border-radius: 9999px;
+  font-size: 0.68rem;
+  line-height: 1;
+  vertical-align: 0.15em;
+  color: rgb(var(--mint));
+  background: rgb(var(--mint) / 0.12);
+  border: 1px solid rgb(var(--mint) / 0.3);
+  cursor: pointer;
+  transition: background-color 150ms;
+}
+.cite-pill:hover { background: rgb(var(--mint) / 0.25); }
+
+/* Blinking caret while an answer streams */
+.stream-cursor {
+  display: inline-block;
+  width: 0.5em;
+  height: 1em;
+  margin-left: 2px;
+  vertical-align: -0.12em;
+  background: rgb(var(--mint) / 0.8);
+  animation: blink 1s steps(2, start) infinite;
+}
+@keyframes blink { to { visibility: hidden; } }
+
+/* Highlighted search terms in the source panel */
+.source-text mark {
+  color: inherit;
+  background: rgb(var(--accent) / 0.25);
+  border-radius: 3px;
+  padding: 0 1px;
+}
+
+/* Source panel entrance: slides up on mobile, in from the right on desktop */
+@keyframes panelUp { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes panelLeft { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+.panel-in { animation: panelUp 0.22s ease-out; }
+@media (min-width: 768px) { .panel-in { animation-name: panelLeft; } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
