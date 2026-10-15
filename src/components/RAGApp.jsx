@@ -11,6 +11,8 @@ import { isBroadQuestion } from '../lib/query.js'
 import { rewriteQuery, streamAnswer, suggestQuestions } from '../lib/llm.js'
 import { EMBED_MODEL_SIZE_MB, FREE_DAILY_ANSWERS } from '../lib/config.js'
 import { readStorage, writeStorage } from '../lib/storage.js'
+import { filterSupported } from '../lib/files.js'
+import { loadChat, saveChat } from '../lib/db.js'
 
 const KEY_STORAGE = 'talktopdf_groq_key'
 const SEMANTIC_STORAGE = 'talktopdf_semantic'
@@ -20,6 +22,34 @@ const freeStorageKey = () => `talktopdf_free_remaining_${new Date().toISOString(
 const defaultSemantic = () => (navigator.connection?.saveData ? 'off' : 'on')
 
 const newId = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+
+function PrivacySection({ onClearAll }) {
+  const [confirming, setConfirming] = useState(false)
+  const [cleared, setCleared] = useState(false)
+  return (
+    <div className="px-5 py-4 border-t border-line space-y-2">
+      <span className="block text-sm text-ink">Privacy</span>
+      <p className="text-xs leading-relaxed text-muted">
+        Files are parsed and indexed on this device. Your documents, their search index and this
+        conversation are saved only in this browser. Questions and the passages used to answer them are
+        sent to Groq to generate answers.
+      </p>
+      <button
+        onClick={async () => {
+          if (!confirming) return setConfirming(true)
+          await onClearAll()
+          setConfirming(false)
+          setCleared(true)
+        }}
+        className={`px-3 py-2 rounded-lg text-xs border transition-colors ${
+          confirming ? 'border-danger/60 text-danger bg-danger/10' : 'border-line-strong text-muted hover:text-danger hover:border-danger/40'
+        }`}
+      >
+        {cleared ? 'All local data deleted' : confirming ? 'Click again to delete everything' : 'Delete all documents and chat from this browser'}
+      </button>
+    </div>
+  )
+}
 
 export default function RAGApp() {
   const [error, setError] = useState(null)
@@ -34,11 +64,13 @@ export default function RAGApp() {
   const [freeRemaining, setFreeRemaining] = useState(() =>
     Number(readStorage(freeStorageKey(), FREE_DAILY_ANSWERS))
   )
+  const [chatLoaded, setChatLoaded] = useState(false)
+  const [dragging, setDragging] = useState(false)
   const abortRef = useRef(null)
   const apiKeyRef = useRef(apiKey)
 
   const embedState = useEmbedState()
-  const { library, docs, stats, addFiles, removeDoc } = useLibrary({ semanticEnabled, onError: setError })
+  const { library, docs, stats, addFiles, removeDoc, clearAll } = useLibrary({ semanticEnabled, onError: setError })
   const usageLimitReached = !apiKey && freeRemaining <= 0
   const readyDocs = docs.filter(d => d.status === 'ready')
   const libraryKey = readyDocs.map(d => d.id).join('|')
@@ -48,6 +80,56 @@ export default function RAGApp() {
     writeStorage(KEY_STORAGE, apiKey || null)
   }, [apiKey])
   useEffect(() => { writeStorage(SEMANTIC_STORAGE, semanticEnabled ? 'on' : 'off') }, [semanticEnabled])
+
+  // Restore the previous conversation, then keep it saved (answers interrupted by a reload are marked stopped).
+  useEffect(() => {
+    let cancelled = false
+    loadChat()
+      .then(saved => {
+        if (cancelled || !saved.length) return
+        setMessages(prev => prev.length ? prev : saved.map(m =>
+          m.status === 'searching' || m.status === 'streaming' ? { ...m, status: 'stopped' } : m
+        ))
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setChatLoaded(true) })
+    return () => { cancelled = true }
+  }, [])
+
+  useEffect(() => {
+    if (!chatLoaded) return
+    const timer = setTimeout(() => saveChat(messages).catch(() => {}), 500)
+    return () => clearTimeout(timer)
+  }, [messages, chatLoaded])
+
+  useEffect(() => {
+    if (!error) return
+    const timer = setTimeout(() => setError(null), 8000)
+    return () => clearTimeout(timer)
+  }, [error])
+
+  // Files can be dropped anywhere on the page.
+  useEffect(() => {
+    const hasFiles = e => Array.from(e.dataTransfer?.types || []).includes('Files')
+    const onDragEnter = e => { if (hasFiles(e)) setDragging(true) }
+    window.addEventListener('dragenter', onDragEnter)
+    return () => window.removeEventListener('dragenter', onDragEnter)
+  }, [])
+
+  const handleWindowDrop = useCallback((e) => {
+    e.preventDefault()
+    setDragging(false)
+    const files = filterSupported(e.dataTransfer.files)
+    if (files.length) addFiles(files)
+    else if (e.dataTransfer.files.length) setError('Only PDF, TXT and MD files are supported.')
+  }, [addFiles])
+
+  const handleClearAll = useCallback(async () => {
+    abortRef.current?.abort()
+    setMessages([])
+    setActiveSource(null)
+    await clearAll()
+  }, [clearAll])
 
   const updateFreeRemaining = useCallback((remaining) => {
     if (remaining === null || Number.isNaN(remaining)) return
@@ -179,6 +261,20 @@ export default function RAGApp() {
         <div className="fixed inset-0 z-30 md:hidden bg-black/60" onClick={() => setSidebarOpen(false)} />
       )}
 
+      {dragging && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-bg/85 backdrop-blur-sm p-6"
+          onDragOver={e => e.preventDefault()}
+          onDragLeave={e => { if (!e.relatedTarget) setDragging(false) }}
+          onDrop={handleWindowDrop}
+        >
+          <div className="pointer-events-none w-full max-w-lg rounded-2xl border-2 border-dashed border-accent/60 bg-accent/5 px-8 py-14 text-center fade-in">
+            <p className="font-serif text-2xl text-accent">Drop to add to your library</p>
+            <p className="text-sm text-muted mt-2">PDF, TXT or Markdown · processed privately in your browser</p>
+          </div>
+        </div>
+      )}
+
       <Sidebar
         docs={docs}
         stats={stats}
@@ -241,6 +337,7 @@ export default function RAGApp() {
             </label>
             <SemanticStatus enabled={semanticEnabled} state={embedState} />
           </div>
+          <PrivacySection onClearAll={handleClearAll} />
         </SettingsPanel>
       )}
     </div>

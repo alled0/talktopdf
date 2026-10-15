@@ -69,6 +69,11 @@ function request(kind, texts) {
   })
 }
 
+/** Starts loading the model (from the browser cache after the first time). */
+export function warmUpEmbedder() {
+  ensureWorker()
+}
+
 /** Embeds document passages. Starts the model download if needed. */
 export function embedPassages(texts) {
   return request('passage', texts)

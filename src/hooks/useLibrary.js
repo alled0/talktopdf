@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { Library } from '../lib/library.js'
-import { extractFile } from '../lib/pdfParser.js'
 import { chunkPages } from '../lib/chunker.js'
-import { embedPassages, getEmbedState, resetEmbedder, subscribeEmbedState } from '../lib/embeddings.js'
+import { embedPassages, getEmbedState, resetEmbedder, subscribeEmbedState, warmUpEmbedder } from '../lib/embeddings.js'
 import { estimateTokens } from '../lib/text.js'
+import * as db from '../lib/db.js'
 
 const EMBED_BATCH = 4
 
@@ -12,16 +12,18 @@ export function useEmbedState() {
 }
 
 const newDocId = () => `doc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+const persist = promise => promise.catch(() => {}) // storage is best effort (private mode, quota)
 
 /**
- * Owns the document library: parsing, chunking, keyword indexing and background embedding.
- * `docs` is the UI-facing list; `library` holds chunks/vectors and is mutated in place
- * (`revision` changes whenever its contents do).
+ * Owns the document library: parsing, chunking, keyword indexing, background embedding and
+ * persistence. `docs` is the UI-facing list; `library` holds chunks/vectors and is mutated in
+ * place (`revision` changes whenever its contents do).
  */
 export function useLibrary({ semanticEnabled, onError }) {
   const [library] = useState(() => new Library())
   const [docs, setDocs] = useState([])
   const [revision, setRevision] = useState(0)
+  const [restored, setRestored] = useState(false)
   const removedRef = useRef(new Set())
   const embeddingRef = useRef(false)
   const semanticRef = useRef(semanticEnabled)
@@ -46,7 +48,10 @@ export function useLibrary({ semanticEnabled, onError }) {
         batch.forEach((chunk, i) => library.setVector(chunk.id, vectors[i]))
         const embedded = chunks.filter(c => c.vec).length
         patchDoc(docId, { embedded })
-        if (embedded === chunks.length) bump()
+        if (embedded === chunks.length) {
+          bump()
+          persist(db.saveChunks(chunks))
+        }
       }
     } catch {
       // The model failed to load or run; keyword search keeps working and the status is shown.
@@ -55,13 +60,38 @@ export function useLibrary({ semanticEnabled, onError }) {
     }
   }, [library, patchDoc, bump])
 
+  // Restore the library saved in this browser.
+  useEffect(() => {
+    let cancelled = false
+    db.loadLibrary()
+      .then(saved => {
+        if (cancelled || !saved.length) return
+        for (const { doc, chunks } of saved) library.addDocument(doc.id, chunks)
+        const restoredDocs = saved.map(({ doc, chunks }) => ({
+          ...doc,
+          status: 'ready',
+          progress: 1,
+          embedded: chunks.filter(c => c.vec).length
+        }))
+        // Keep any upload the user started while the saved library was loading.
+        setDocs(prev => [...restoredDocs, ...prev.filter(d => !restoredDocs.some(r => r.id === d.id))])
+        bump()
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setRestored(true) })
+    return () => { cancelled = true }
+  }, [library, bump])
+
   useEffect(() => {
     semanticRef.current = semanticEnabled
-    if (semanticEnabled) {
+    if (semanticEnabled && restored) {
       if (getEmbedState().status === 'error') resetEmbedder()
-      if (library.size) embedPending()
+      if (library.size) {
+        warmUpEmbedder() // restored vectors still need the model to embed questions
+        embedPending()
+      }
     }
-  }, [semanticEnabled, library, embedPending])
+  }, [semanticEnabled, restored, library, embedPending])
 
   const addFiles = useCallback(async (files) => {
     for (const file of files) {
@@ -79,6 +109,7 @@ export function useLibrary({ semanticEnabled, onError }) {
       }])
 
       try {
+        const { extractFile } = await import('../lib/pdfParser.js')
         const { pages, pageCount, emptyPages } = await extractFile(file, {
           onProgress: ({ page, total }) => patchDoc(id, { progress: page / total })
         })
@@ -87,8 +118,10 @@ export function useLibrary({ semanticEnabled, onError }) {
         if (!chunks.length) throw new Error('No readable text found.')
 
         library.addDocument(id, chunks)
-        patchDoc(id, { status: 'ready', progress: 1, pageCount, emptyPages, chunkCount: chunks.length })
+        const meta = { id, name: file.name, size: file.size, pageCount, emptyPages, chunkCount: chunks.length, addedAt: Date.now() }
+        patchDoc(id, { ...meta, status: 'ready', progress: 1 })
         bump()
+        persist(db.saveDocument(meta, chunks))
         if (semanticRef.current) embedPending()
       } catch (err) {
         onError?.(`Couldn't read "${file.name}": ${err.message}`)
@@ -102,6 +135,18 @@ export function useLibrary({ semanticEnabled, onError }) {
     library.removeDocument(id)
     setDocs(prev => prev.filter(d => d.id !== id))
     bump()
+    persist(db.deleteDocument(id))
+  }, [library, bump])
+
+  /** Removes every document and the saved conversation from this browser. */
+  const clearAll = useCallback(async () => {
+    for (const id of library.docIds()) {
+      removedRef.current.add(id)
+      library.removeDocument(id)
+    }
+    setDocs([])
+    bump()
+    await persist(db.clearAll())
   }, [library, bump])
 
   const stats = useMemo(() => {
@@ -112,5 +157,5 @@ export function useLibrary({ semanticEnabled, onError }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [library, revision])
 
-  return { library, docs, revision, stats, addFiles, removeDoc }
+  return { library, docs, stats, restored, addFiles, removeDoc, clearAll }
 }

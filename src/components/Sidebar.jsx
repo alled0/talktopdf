@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useRef } from 'react'
 import DocItem from './DocItem.jsx'
 import SemanticStatus from './SemanticStatus.jsx'
 import { CloseIcon, FolderIcon, PaperclipIcon, SettingsIcon } from './Icons.jsx'
@@ -10,15 +10,6 @@ export default function Sidebar({
   semanticEnabled, embedState, onOpenSettings
 }) {
   const fileInputRef = useRef(null)
-  const [dragging, setDragging] = useState(false)
-
-  const handleDrop = useCallback((e) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setDragging(false)
-    const files = filterSupported(e.dataTransfer.files)
-    if (files.length > 0) onFilesAdded(files)
-  }, [onFilesAdded])
 
   const handleFileInput = useCallback((e) => {
     const files = filterSupported(e.target.files)
@@ -49,12 +40,7 @@ export default function Sidebar({
 
       <button
         type="button"
-        className={`mx-3 mt-3 rounded-lg border-2 border-dashed px-4 py-5 transition-colors duration-200 ${
-          dragging ? 'border-accent bg-accent/10' : 'border-accent/20 hover:border-accent/50'
-        }`}
-        onDrop={handleDrop}
-        onDragOver={e => { e.preventDefault(); setDragging(true) }}
-        onDragLeave={() => setDragging(false)}
+        className="mx-3 mt-3 rounded-lg border-2 border-dashed px-4 py-5 transition-colors duration-200 border-accent/20 hover:border-accent/50"
         onClick={() => fileInputRef.current?.click()}
       >
         <div className="flex flex-col items-center gap-2 text-center">
@@ -62,7 +48,7 @@ export default function Sidebar({
             <PaperclipIcon size={20} />
           </div>
           <div>
-            <p className="text-sm font-medium text-accent">{dragging ? 'Drop to add' : 'Drop files or click'}</p>
+            <p className="text-sm font-medium text-accent">Drop files or click</p>
             <p className="text-xs mt-1 text-subtle">PDF, TXT, MD · stays on your device</p>
           </div>
         </div>

@@ -4,7 +4,9 @@ export function describeSemantic(enabled, state) {
   if (!enabled) return { tone: 'off', text: 'Keyword search only' }
   switch (state.status) {
     case 'loading':
-      return { tone: 'busy', text: `Loading semantic model… ${Math.round(state.progress)}%` }
+      return state.progress >= 99.5
+        ? { tone: 'busy', text: 'Starting semantic model…' }
+        : { tone: 'busy', text: `Loading semantic model… ${Math.round(state.progress)}%` }
     case 'ready':
       return { tone: 'ok', text: 'Semantic + keyword search' }
     case 'error':
