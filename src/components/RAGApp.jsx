@@ -16,6 +16,7 @@ import { loadChat, saveChat } from '../lib/db.js'
 
 const KEY_STORAGE = 'talktopdf_groq_key'
 const SEMANTIC_STORAGE = 'talktopdf_semantic'
+const MODEL_STARTUP_WAIT_MS = 15000
 const freeStorageKey = () => `talktopdf_free_remaining_${new Date().toISOString().slice(0, 10)}`
 
 // Semantic search downloads a model once; skip it by default on data-saver connections.
@@ -186,7 +187,11 @@ export default function RAGApp() {
         }
       }
 
-      const queryVec = semanticEnabled ? await embedQuery(query) : null
+      // A restored library has vectors but the model still takes a few seconds to load from the
+      // cache. Wait for it: without the query vector, a question in another language finds nothing.
+      // A first-time visitor whose model is still downloading isn't kept waiting.
+      const waitMs = library.allChunks().some(c => c.vec) ? MODEL_STARTUP_WAIT_MS : 0
+      const queryVec = semanticEnabled ? await embedQuery(query, { waitMs }) : null
       const result = retrieve(library, { query, queryVec, scope })
       patch({ status: 'streaming', query, sources: result.sources, mode: result.mode, lowConfidence: result.lowConfidence })
 
