@@ -31,6 +31,12 @@ is your question and the few passages needed to answer it.
 
 ## How it works
 
+When you add a PDF, pdf.js extracts its text in the browser. The text is cleaned up and split into
+overlapping chunks that remember their pages, then indexed two ways: BM25 for keywords and a
+multilingual embedding model for meaning. For each question, the best chunks from both indexes are
+merged and sent to `api/chat`, a Vercel function that holds the Groq key, builds the prompt and
+streams back an answer with page citations.
+
 ```mermaid
 flowchart LR
   subgraph Browser
@@ -127,6 +133,9 @@ relay.
   directly with your key or through the proxy (and to Gemini instead, if the site owner enabled
   it as overflow).
 - A Groq key you add is stored in `localStorage` in your browser and sent only to Groq.
+- The site's own Groq and Gemini keys are server-side environment variables, read only by the
+  [`api/chat.js`](api/chat.js) function. They never reach the browser: the client uses no `VITE_`
+  variables, and the proxy returns only answers and generic error messages.
 
 ## Limitations
 
