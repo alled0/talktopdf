@@ -2,6 +2,15 @@
   "name": "talktopdf",
   "private": true,
   "version": "0.1.0",
+  "description": "Chat with your PDFs and get answers that cite the exact page. Hybrid search runs in the browser; answers come from Groq through a Vercel function.",
+  "homepage": "https://talktopdf-omega.vercel.app",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/alled0/talktopdf.git"
+  },
+  "license": "MIT",
+  "author": "Alwaleed Almutairi (https://github.com/alled0)",
+  "keywords": ["rag", "pdf", "semantic-search", "bm25", "groq", "react", "vite", "transformers-js"],
   "type": "module",
   "scripts": {
     "dev": "vite",
