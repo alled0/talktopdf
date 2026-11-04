@@ -1,33 +1,63 @@
+<div align="center">
+
+<img src="public/favicon.svg" width="76" height="76" alt="TalkToPDF logo">
+
 # TalkToPDF
 
-Chat with your PDFs and get answers that cite the exact page they came from. Parsing, indexing and
-search all run **in your browser**. Your files never leave your device. The only data sent anywhere
-is your question and the few passages needed to answer it.
+**Chat with your PDFs and get answers that cite the exact page they came from.**<br>
+Search runs privately in your browser. Ask in English, Arabic or 100+ other languages.
 
-**Live demo: [talktopdf-omega.vercel.app](https://talktopdf-omega.vercel.app)**
+[**Try the live demo →**](https://talktopdf-omega.vercel.app)
 
-![Answer with a clickable citation and the cited passage open](docs/screenshot.png)
+[![CI](https://github.com/alled0/talktopdf/actions/workflows/ci.yml/badge.svg)](https://github.com/alled0/talktopdf/actions/workflows/ci.yml)
+[![Live demo](https://img.shields.io/badge/demo-live-5dbaa0?style=flat)](https://talktopdf-omega.vercel.app)
+[![License: MIT](https://img.shields.io/badge/license-MIT-c8a96e?style=flat)](LICENSE)
 
-- **Hybrid search.** BM25 keyword search plus multilingual semantic embeddings, fused with
-  Reciprocal Rank Fusion. Finds "how many days off do I get?" in a passage that only says
-  "27 days of paid annual leave".
-- **Clickable citations.** Every `[n]` in an answer opens the exact passage and page the model saw,
-  with your search terms highlighted.
+<img src="docs/images/demo.gif" width="100%" alt="Demo: a PDF handbook is dropped in and indexed, the question “Can I fly business class?” gets the answer “Yes, for flights of six hours or longer” with a citation, and clicking the citation opens the exact passage on pages 7 to 8">
+
+</div>
+
+## What it does
+
+Drop in a PDF, ask a question in plain language, and get an answer with numbered citations. Click a
+citation to read the exact passage the answer came from, with your search terms highlighted.
+
+Your documents are read, indexed and searched on your own device. Only your question and the few
+passages needed to answer it are sent to the AI. It's free to use and needs no account.
+
+## Highlights
+
+- **Answers you can check.** Every `[n]` opens the exact passage and page the model was given.
+- **Finds meaning, not just words.** Hybrid search combines BM25 keyword search with multilingual
+  embeddings (Reciprocal Rank Fusion), so "how many days off do I get?" finds a passage that only
+  says "27 days of paid annual leave".
 - **Multilingual, including Arabic.** Right-to-left PDF text is reconstructed correctly, and you can
-  ask in Arabic about an English document (or the other way round).
+  ask in Arabic about an English document, or the other way round.
+- **Private by design.** Parsing, indexing and search run in the browser, and the library is kept in
+  IndexedDB on your device. The site's API key lives only on the server.
 - **Handles real documents.** Removes running headers, footers and page numbers, repairs hyphenation,
   splits text into sentence-aligned chunks that know their pages, and warns about scanned pages.
-- **Smart context.**
-  - Short files are sent whole.
-  - Summary-type questions get passages sampled from across the document (k-means over embeddings).
-  - Follow-up questions are rewritten into standalone searches.
-- **Feels like a product.** Streaming answers with a stop button, retry, starter questions generated
-  from your files, drag and drop anywhere, and a library and chat that survive a reload (IndexedDB).
-  Works on mobile.
-- **Free to use, no key needed.** A Vercel function answers with Groq's `gpt-oss-120b`. When a
-  model is busy, used up or retired, it falls back automatically to `gpt-oss-20b` (Groq's free
-  quotas are per model, so this doubles capacity) and optionally to Gemini. Visitors can add their
-  own free Groq key in one click for a personal quota.
+- **Smart context.** Short files are sent whole. Summary questions get passages sampled across the
+  document (k-means over embeddings). Follow-up questions are rewritten into standalone searches.
+- **Feels like a product.** Streaming answers with stop and retry, starter questions generated from
+  your files, drag and drop anywhere, a library and chat that survive a reload, and a mobile layout.
+- **Keeps working when a model doesn't.** Answers come from Groq's `gpt-oss-120b` and fall back to
+  `gpt-oss-20b` (and optionally Gemini) when a model is busy, out of quota or retired.
+
+## A closer look
+
+**Ask in Arabic about an English document.** The answer comes back in Arabic, and its citation opens
+the English passage it was based on.
+
+<p align="center">
+  <img src="docs/images/arabic.png" width="760" alt="An Arabic question about annual leave answered in Arabic (27 days, rising to 31 with seniority), with citation 1 opening the English handbook passage on page 5">
+</p>
+
+**On your phone:** a cited answer, the passage behind it, and your document library.
+
+<p align="center">
+  <img src="docs/images/mobile.png" width="100%" alt="Three phone screens: an answer to “Can I work from home?” with a page citation, the cited passage from page 4 with search terms highlighted, and the documents drawer listing two PDFs">
+</p>
 
 ## How it works
 
@@ -37,25 +67,10 @@ multilingual embedding model for meaning. For each question, the best chunks fro
 merged and sent to `api/chat`, a Vercel function that holds the Groq key, builds the prompt and
 streams back an answer with page citations.
 
-```mermaid
-flowchart LR
-  subgraph Browser
-    A["PDF / TXT / MD"] --> B["pdf.js text + layout cleanup"]
-    B --> C["Sentence-aligned chunks<br/>with page ranges"]
-    C --> D["BM25 index"]
-    C --> E["multilingual-e5-small<br/>(Web Worker)"]
-    E --> F[("IndexedDB")]
-    D --> F
-    Q["Question"] --> R["Rewrite follow-ups,<br/>broad or specific?"]
-    R --> S{"Retrieve"}
-    D --> S
-    E --> S
-    S -->|"RRF + MMR"| X["Numbered excerpts"]
-  end
-  X --> P["api/chat:<br/>prompt + fair-use guard"]
-  P --> G["Groq gpt-oss-120b<br/>→ gpt-oss-20b → Gemini (optional)"]
-  G -->|"streamed answer with citations"| UI["Chat UI"]
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/architecture-dark.svg">
+  <img src="docs/images/architecture-light.svg" width="100%" alt="Architecture: in the browser, files are extracted, chunked and indexed with BM25 and multilingual embeddings (both saved in IndexedDB); a question goes through follow-up rewriting and hybrid search to numbered excerpts; the Vercel function api/chat holds the API key, builds the prompt and applies a fair-use limit, then calls Groq gpt-oss-120b with fallback to gpt-oss-20b and Gemini; the answer streams back with citations">
+</picture>
 
 | Step | What happens | Code |
 |---|---|---|
@@ -84,7 +99,7 @@ The hybrid gives the best recall, which matters most because the model reads all
 Semantic-only search ranks the right passage first more often but misses keyword-heavy questions.
 The benchmark is small and synthetic, so treat it as a regression check, not a leaderboard.
 
-## Getting started
+## Run it locally
 
 ```bash
 npm install
@@ -97,14 +112,16 @@ Without a server key you can still use the app by pasting your own Groq key in *
 | Script | |
 |---|---|
 | `npm run dev` | Vite dev server, including the `/api/chat` function |
-| `npm test` | Unit tests (`node --test`, no extra dependencies) |
+| `npm test` | 50 unit tests (`node --test`, no extra dependencies) |
 | `npm run lint` | ESLint, including the React Hooks rules |
 | `npm run eval` | Retrieval benchmark (downloads the embedding model on the first run) |
 | `npm run build` | Production build |
 
-## Deploying to Vercel
+GitHub Actions runs lint, the tests and a production build on every push and pull request.
 
-1. Import the repository. The framework preset is Vite.
+## Deploy your own
+
+1. Import the repository into Vercel. The framework preset is Vite.
 2. Set `GROQ_API_KEY` ([free key](https://console.groq.com/keys)).
 
 | Variable | Default | Purpose |
@@ -124,7 +141,7 @@ key, which takes about a minute and gives that visitor their own quota. The prox
 model, builds the prompt itself and caps the payload size, so it can't be used as a general LLM
 relay.
 
-## Privacy
+## Privacy and security
 
 - Files are read, chunked and embedded locally. They are never uploaded.
 - The library (text, search index, embeddings) and the conversation are stored in the browser's
@@ -150,5 +167,13 @@ relay.
 React 18, Vite, Tailwind CSS, pdf.js, Transformers.js (ONNX Runtime Web), Groq (gpt-oss), and Vercel
 Functions.
 
-Built by [@alled0](https://github.com/alled0) ·
+---
+
+<div align="center">
+
+Built by **Alwaleed Almutairi** · [GitHub](https://github.com/alled0) ·
 [LinkedIn](https://www.linkedin.com/in/alwaleed-meshal-almutairi-8a48ab263/)
+
+Released under the [MIT License](LICENSE).
+
+</div>

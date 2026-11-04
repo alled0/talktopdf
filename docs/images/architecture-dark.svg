@@ -1,0 +1,121 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 556" width="960" height="556" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" role="img" aria-label="TalkToPDF architecture: documents are parsed, chunked and indexed in the browser; questions are matched with hybrid search; a Vercel function holding the API key asks Groq and streams back a cited answer.">
+  <defs><marker id="head-6f747c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6f747c"/></marker><marker id="head-5dbaa0" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#5dbaa0"/></marker></defs>
+
+  <g>
+    <rect x="16" y="16" width="620" height="484" rx="16" fill="#15171b" stroke="#2b2f36"/>
+    <text x="36" y="46" font-size="11.5" font-weight="700" letter-spacing="1.2" fill="#c8a96e">IN YOUR BROWSER</text>
+    <text x="616" y="46" text-anchor="end" font-size="11.5" fill="#9c9890">files never leave the device</text>
+  </g>
+  <g>
+    <rect x="668" y="16" width="276" height="236" rx="16" fill="#15171b" stroke="#2b2f36"/>
+    <text x="688" y="46" font-size="11.5" font-weight="700" letter-spacing="1.2" fill="#c8a96e">VERCEL FUNCTION</text>
+    
+  </g>
+  <g>
+    <rect x="668" y="268" width="276" height="232" rx="16" fill="#15171b" stroke="#2b2f36"/>
+    <text x="688" y="298" font-size="11.5" font-weight="700" letter-spacing="1.2" fill="#c8a96e">LLM (GROQ)</text>
+    
+  </g>
+
+  <!-- Indexing -->
+  <g>
+    <rect x="36" y="64" width="176" height="54" rx="10" fill="#1c1f24" stroke="#363b43"/>
+    <text x="124" y="87" text-anchor="middle" font-size="14.5" font-weight="600" fill="#ece9e2">Your files</text>
+    <text x="124" y="105" text-anchor="middle" font-size="12" fill="#9c9890">PDF · TXT · Markdown</text>
+  </g>
+  <g>
+    <rect x="238" y="64" width="176" height="54" rx="10" fill="#1c1f24" stroke="#363b43"/>
+    <text x="326" y="87" text-anchor="middle" font-size="14.5" font-weight="600" fill="#ece9e2">Extract text</text>
+    <text x="326" y="105" text-anchor="middle" font-size="12" fill="#9c9890">pdf.js, RTL, header cleanup</text>
+  </g>
+  <g>
+    <rect x="440" y="64" width="176" height="54" rx="10" fill="#1c1f24" stroke="#363b43"/>
+    <text x="528" y="87" text-anchor="middle" font-size="14.5" font-weight="600" fill="#ece9e2">Chunk</text>
+    <text x="528" y="105" text-anchor="middle" font-size="12" fill="#9c9890">~200 words, page-tagged</text>
+  </g>
+  <path d="M212 91 H236" fill="none" stroke="#6f747c" stroke-width="1.6" marker-end="url(#head-6f747c)"/>
+  <path d="M414 91 H438" fill="none" stroke="#6f747c" stroke-width="1.6" marker-end="url(#head-6f747c)"/>
+  <path d="M528 118 V142" fill="none" stroke="#6f747c" stroke-width="1.6"/>
+  <path d="M528 142 H326 V164" fill="none" stroke="#6f747c" stroke-width="1.6" marker-end="url(#head-6f747c)"/>
+  <path d="M528 142 V164" fill="none" stroke="#6f747c" stroke-width="1.6" marker-end="url(#head-6f747c)"/>
+  <g>
+    <rect x="238" y="166" width="176" height="54" rx="10" fill="#1c1f24" stroke="#363b43"/>
+    <text x="326" y="189" text-anchor="middle" font-size="14.5" font-weight="600" fill="#ece9e2">Keyword index</text>
+    <text x="326" y="207" text-anchor="middle" font-size="12" fill="#9c9890">BM25 · Arabic-aware</text>
+  </g>
+  <g>
+    <rect x="440" y="166" width="176" height="54" rx="10" fill="#1c1f24" stroke="#363b43"/>
+    <text x="528" y="189" text-anchor="middle" font-size="14.5" font-weight="600" fill="#ece9e2">Semantic index</text>
+    <text x="528" y="207" text-anchor="middle" font-size="12" fill="#9c9890">multilingual-e5 · Worker</text>
+  </g>
+  <text x="222" y="190" text-anchor="end" font-size="11.5" fill="#9c9890">both saved in</text>
+  <text x="222" y="206" text-anchor="end" font-size="11.5" fill="#9c9890">IndexedDB</text>
+
+  <!-- Asking -->
+  <g>
+    <rect x="36" y="292" width="176" height="54" rx="10" fill="#1c1f24" stroke="#363b43"/>
+    <text x="124" y="315" text-anchor="middle" font-size="14.5" font-weight="600" fill="#ece9e2">Your question</text>
+    <text x="124" y="333" text-anchor="middle" font-size="12" fill="#9c9890">in any language</text>
+  </g>
+  <g>
+    <rect x="238" y="292" width="176" height="54" rx="10" fill="#1c1f24" stroke="#363b43"/>
+    <text x="326" y="315" text-anchor="middle" font-size="14.5" font-weight="600" fill="#ece9e2">Understand it</text>
+    <text x="326" y="333" text-anchor="middle" font-size="12" fill="#9c9890">rewrite follow-ups</text>
+  </g>
+  <g>
+    <rect x="440" y="292" width="176" height="54" rx="10" fill="#1c1f24" stroke="#363b43"/>
+    <text x="528" y="315" text-anchor="middle" font-size="14.5" font-weight="600" fill="#ece9e2">Hybrid search</text>
+    <text x="528" y="333" text-anchor="middle" font-size="12" fill="#9c9890">RRF fusion + MMR</text>
+  </g>
+  <path d="M212 319 H236" fill="none" stroke="#6f747c" stroke-width="1.6" marker-end="url(#head-6f747c)"/>
+  <path d="M414 319 H438" fill="none" stroke="#6f747c" stroke-width="1.6" marker-end="url(#head-6f747c)"/>
+  <path d="M326 220 V256 H490 V290" fill="none" stroke="#6f747c" stroke-width="1.6" marker-end="url(#head-6f747c)"/>
+  <path d="M566 220 V290" fill="none" stroke="#6f747c" stroke-width="1.6" marker-end="url(#head-6f747c)"/>
+  <g>
+    <rect x="440" y="410" width="176" height="54" rx="10" fill="#1c1f24" stroke="#363b43"/>
+    <text x="528" y="433" text-anchor="middle" font-size="14.5" font-weight="600" fill="#ece9e2">Top excerpts</text>
+    <text x="528" y="451" text-anchor="middle" font-size="12" fill="#9c9890">numbered, with pages</text>
+  </g>
+  <path d="M528 346 V408" fill="none" stroke="#6f747c" stroke-width="1.6" marker-end="url(#head-6f747c)"/>
+  <g>
+    <rect x="36" y="410" width="378" height="54" rx="10" fill="#1c1f24" stroke="#363b43"/>
+    <text x="225" y="433" text-anchor="middle" font-size="14.5" font-weight="600" fill="#ece9e2">Streamed answer with citations</text>
+    <text x="225" y="451" text-anchor="middle" font-size="12" fill="#9c9890">click [1] to open the exact passage</text>
+  </g>
+
+  <!-- Server -->
+  <g>
+    <rect x="688" y="64" width="236" height="54" rx="10" fill="#1c1f24" stroke="#363b43"/>
+    <text x="806" y="87" text-anchor="middle" font-size="14.5" font-weight="600" fill="#ece9e2">api/chat</text>
+    <text x="806" y="105" text-anchor="middle" font-size="12" fill="#9c9890">builds the prompt itself</text>
+  </g>
+  <g>
+    <rect x="688" y="130" width="236" height="54" rx="10" fill="#2a2418" stroke="#6b5a36"/>
+    <text x="806" y="153" text-anchor="middle" font-size="14.5" font-weight="600" fill="#e2c68e">Holds the API key</text>
+    <text x="806" y="171" text-anchor="middle" font-size="12" fill="#9c9890">never sent to the browser</text>
+  </g>
+  <g>
+    <rect x="688" y="196" width="236" height="42" rx="10" fill="#1c1f24" stroke="#363b43"/>
+    <text x="806" y="219" text-anchor="middle" font-size="14.5" font-weight="600" fill="#ece9e2">Fair-use limit</text>
+    <text x="806" y="237" text-anchor="middle" font-size="12" fill="#9c9890">per visitor, per day</text>
+  </g>
+  <path d="M616 437 H652 V91 H686" fill="none" stroke="#5dbaa0" stroke-width="1.6" marker-end="url(#head-5dbaa0)"/>
+  <text transform="translate(647 300) rotate(-90)" text-anchor="middle" font-size="11.5" fill="#5dbaa0">question + excerpts</text>
+
+  <!-- LLM -->
+  <g>
+    <rect x="688" y="316" width="236" height="54" rx="10" fill="#1c1f24" stroke="#363b43"/>
+    <text x="806" y="339" text-anchor="middle" font-size="14.5" font-weight="600" fill="#ece9e2">gpt-oss-120b</text>
+    <text x="806" y="357" text-anchor="middle" font-size="12" fill="#9c9890">main model</text>
+  </g>
+  <g>
+    <rect x="688" y="408" width="236" height="54" rx="10" fill="#1c1f24" stroke="#363b43"/>
+    <text x="806" y="431" text-anchor="middle" font-size="14.5" font-weight="600" fill="#ece9e2">gpt-oss-20b → Gemini</text>
+    <text x="806" y="449" text-anchor="middle" font-size="12" fill="#9c9890">automatic fallback</text>
+  </g>
+  <path d="M806 240 V314" fill="none" stroke="#6f747c" stroke-width="1.6" marker-end="url(#head-6f747c)"/>
+  <path d="M806 370 V406" fill="none" stroke="#6f747c" stroke-width="1.6" marker-end="url(#head-6f747c)"/>
+  <text x="816" y="393" text-anchor="start" font-size="11.5" fill="#9c9890">busy or retired</text>
+  <path d="M806 462 V528 H225 V466" fill="none" stroke="#5dbaa0" stroke-width="1.6" marker-end="url(#head-5dbaa0)"/>
+  <text x="490" y="546" text-anchor="middle" font-size="11.5" fill="#5dbaa0">answer streams back token by token</text>
+</svg>
