@@ -9,7 +9,6 @@ Search runs privately in your browser. Ask in English, Arabic or 100+ other lang
 
 [**Try the live demo →**](https://talktopdf-omega.vercel.app)
 
-[![CI](https://github.com/alled0/talktopdf/actions/workflows/ci.yml/badge.svg)](https://github.com/alled0/talktopdf/actions/workflows/ci.yml)
 [![Live demo](https://img.shields.io/badge/demo-live-5dbaa0?style=flat)](https://talktopdf-omega.vercel.app)
 [![License: MIT](https://img.shields.io/badge/license-MIT-c8a96e?style=flat)](LICENSE)
 
@@ -116,8 +115,6 @@ Without a server key you can still use the app by pasting your own Groq key in *
 | `npm run lint` | ESLint, including the React Hooks rules |
 | `npm run eval` | Retrieval benchmark (downloads the embedding model on the first run) |
 | `npm run build` | Production build |
-
-GitHub Actions runs lint, the tests and a production build on every push and pull request.
 
 ## Deploy your own
 
