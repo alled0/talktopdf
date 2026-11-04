@@ -79,9 +79,30 @@ export function embedPassages(texts) {
   return request('passage', texts)
 }
 
-/** Embeds a search query, or returns null when the model isn't ready yet. */
-export async function embedQuery(text) {
-  if (state.status !== 'ready') return null
+/** Resolves true once the model is ready, or false if it fails, isn't loading, or `timeoutMs` passes. */
+export function whenReady(timeoutMs) {
+  if (state.status === 'ready') return Promise.resolve(true)
+  if (state.status !== 'loading' || timeoutMs <= 0) return Promise.resolve(false)
+  return new Promise(resolve => {
+    let unsubscribe = () => {}
+    const finish = ready => {
+      clearTimeout(timer)
+      unsubscribe()
+      resolve(ready)
+    }
+    const timer = setTimeout(() => finish(false), timeoutMs)
+    unsubscribe = subscribeEmbedState(() => {
+      if (state.status !== 'loading') finish(state.status === 'ready')
+    })
+  })
+}
+
+/**
+ * Embeds a search query, or returns null when the model isn't ready. While the model is still
+ * starting up, waits up to `waitMs` for it first.
+ */
+export async function embedQuery(text, { waitMs = 0 } = {}) {
+  if (!(await whenReady(waitMs))) return null
   try {
     const [vector] = await request('query', [text])
     return vector
