@@ -89,7 +89,7 @@ containing the answer is among the excerpts sent to the model.
 
 | Method | Recall@1 | Recall@3 | Recall@6 | MRR | English (25) | Arabic → English (3) |
 |---|---|---|---|---|---|---|
-| Original TF-IDF (before this upgrade) | 68% | 79% | 86% | 0.75 | 24/25 | 0/3 |
+| TF-IDF (the first version) | 68% | 79% | 86% | 0.75 | 24/25 | 0/3 |
 | BM25 only | 71% | 86% | 93% | 0.79 | 25/25 | 1/3 |
 | Semantic only | 82% | 89% | 89% | 0.85 | 23/25 | 2/3 |
 | **Hybrid (shipped)** | 75% | **93%** | **96%** | 0.84 | **25/25** | 2/3 |
